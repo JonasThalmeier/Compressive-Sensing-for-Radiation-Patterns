@@ -1,6 +1,6 @@
 import numpy as np
 
-def generate_synthetic_data(N, M, rho, sigma):
+def generate_synthetic_data(N, M, rho, sigma, seed=42):
     """
     Generate synthetic data t = Phi * w + e.
 
@@ -16,6 +16,10 @@ def generate_synthetic_data(N, M, rho, sigma):
         w (numpy.ndarray): Sparse frequency-domain signal of length M.
         e (numpy.ndarray): Noise vector of length N.
     """
+
+    # Set random seed
+    np.random.seed(seed)
+    
     # Step 1: Create Fourier transform matrix (M x M)
     F = np.fft.fft(np.eye(M))  # Full Fourier transform matrix (complex-valued)
     F = F / np.sqrt(M)  # Normalize the Fourier transform matrix

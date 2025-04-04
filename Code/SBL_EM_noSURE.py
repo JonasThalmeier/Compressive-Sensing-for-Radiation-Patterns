@@ -1,5 +1,5 @@
 from synthetic_data import generate_synthetic_data  # Import the function
-from EM import SBL_EM  # Import the SBL_EM class
+from EM_wo_SURE import SBL_EM  # Import the SBL_EM class
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     # Run SBL
     track_iterations = np.arange(1, 1001, 10)  # Define tracking iterations
-    sbl = SBL_EM(t, Phi, 1000000, 1e-8)  # Initialize SBL with EM algorithm
+    sbl = SBL_EM(t, Phi, 10000, 1e-8)  # Initialize SBL with EM algorithm
     w_estimated, tracked_weights = sbl.fit(track_iterations)
     
     # Calculate and plot MSE evolution
