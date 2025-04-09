@@ -1,6 +1,8 @@
 import numpy as np
 from synthetic_data import generate_synthetic_data
-
+"""
+Algorithm according to paper 'Sparse Bayesian Learning for Basis Selection' from Wimpf & Rao
+"""
 class SBL_EM:
     def __init__(self, t, Phi, max_iter=1000, threshold=1e-6):
         """
