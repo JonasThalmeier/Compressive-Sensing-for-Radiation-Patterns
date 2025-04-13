@@ -4,7 +4,7 @@ from synthetic_data import generate_synthetic_data
 Algorithm according to paper 'Sparse Bayesian Learning for Basis Selection' from Wimpf & Rao
 """
 class SBL_EM:
-    def __init__(self, t, Phi, max_iter=1000, threshold=1e-6):
+    def __init__(self, t, Phi, max_iter=1000, threshold=1e-6, beta=1.0):
         """
         Initialize SBL with EM algorithm
         
@@ -22,17 +22,17 @@ class SBL_EM:
         
         # Initialize hyperparameters
         self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
-        self.beta = 1.0  # Noise precision (1/sigma^2)
+        self.beta = beta  # Noise precision (1/sigma^2)
 
         self.gamma = np.ones(self.D)  # Variances of weights
-        self.sigma_squared = 1.0  # Noise variance
+        self.sigma_squared = 1/beta  # Noise variance
         
     def estimate_posterior(self):
         """E-step: Estimate posterior distribution of w"""
         # Compute posterior covariance using gamma and sigma_squared
-        Sigma = np.linalg.inv((1/self.sigma_squared) * self.Phi.T @ self.Phi + np.diag(1/self.gamma))
+        Sigma = np.linalg.inv(self.beta * self.Phi.T @ self.Phi + np.diag(1/self.gamma))
         # Compute posterior mean
-        mu = (1/self.sigma_squared) * Sigma @ self.Phi.T @ self.t
+        mu = self.beta * Sigma @ self.Phi.T @ self.t
         return mu, Sigma
     
     def maximize(self, mu, Sigma):
@@ -52,8 +52,8 @@ class SBL_EM:
         # Update sigma_squared (noise variance)
         error = self.t - self.Phi @ mu
         N_eff = np.sum(self.gamma / (self.gamma + np.diag(Sigma)))
-        self.sigma_squared = (np.sum(np.square(error)) + self.sigma_squared * np.sum(np.ones(self.D)-np.diag(Sigma)/self.gamma)) / self.N
-
+        # self.sigma_squared = (np.sum(np.square(error)) + self.sigma_squared * np.sum(np.ones(self.D)-np.diag(Sigma)/self.gamma)) / self.N
+        # self.beta = 1 / self.sigma_squared
 
         
     def fit(self, track_iterations=np.arange(1, 1001, 100)):
@@ -66,7 +66,7 @@ class SBL_EM:
             mu: final weight estimates
             tracked_weights: dictionary with weights at specified iterations
         """
-        old_gamma = np.ones_like(self.gamma)
+        old_mu = np.ones(self.D)
         tracked_weights = np.zeros((len(track_iterations), self.D))
         
         for iter in range(self.max_iter):
@@ -82,11 +82,11 @@ class SBL_EM:
             self.maximize(mu, Sigma)
             
             # Check convergence
-            change = np.max(np.abs(1/old_gamma - 1/self.gamma))
+            change = np.max(np.abs(old_mu - mu))
             if change < self.threshold:
                 print(f"Converged after {iter+1} iterations")
                 break
                 
-            old_gamma = self.gamma.copy()
+            old_mu = mu.copy()
         
         return mu, tracked_weights

@@ -10,18 +10,19 @@ if __name__ == "__main__":
     D = 30  # Length of frequency-domain signal (D > N)
     rho = 0.1  # Sparsity factor
     sigma = 0.01  # Standard deviation of noise
-    threshold = 1e-2  # Convergence threshold
+    threshold = 0  # Convergence threshold
+    max_iter = 200
     t, Phi, w_true, e = generate_synthetic_data(N, D, rho, sigma)
     
     # Run both algorithms for comparison
-    track_iterations = np.arange(1, 1001, 10)
+    track_iterations = np.arange(1, max_iter+1, 10)
     
     # Run CoFEM
-    sbl_cofem = SBL_CoFEM(t, Phi, num_probes=1000, max_iter=1000, threshold=threshold, beta=1/sigma**2, precondition=True)
+    sbl_cofem = SBL_CoFEM(t, Phi, num_probes=1000, max_iter=max_iter, threshold=threshold, beta=1/sigma**2, precondition=True)
     w_cofem, tracked_weights_cofem = sbl_cofem.fit(track_iterations)
     
     # Run EM for comparison
-    sbl_em = SBL_EM(t, Phi, max_iter=1000, threshold=threshold)
+    sbl_em = SBL_EM(t, Phi, max_iter=max_iter, threshold=threshold, beta=1/sigma**2)
     w_em, tracked_weights_em = sbl_em.fit(track_iterations)
     
     # Calculate MSE evolution for both methods

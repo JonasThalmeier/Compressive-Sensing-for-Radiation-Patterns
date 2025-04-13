@@ -33,7 +33,7 @@ class SBL_CoFEM:
         """Sample Rademacher probes {±1}."""
         return 2 * (np.random.rand(*size) > 0.5) - 1
     
-    def _conj_grad(self, A, b, M_inv=None, max_iters=1000, tol=1e-10):
+    def _conj_grad(self, A, b, M_inv=None, max_iters=1000, tol=1e-3):
         """Parallel Conjugate Gradient solver following Algorithm 2."""
         x = np.zeros_like(b)
         r = b.copy()
@@ -56,8 +56,8 @@ class SBL_CoFEM:
             gamma = rho / pi
             
             # Update solution and residual
-            x = x + gamma[:, np.newaxis] * p
-            r = r - gamma[:, np.newaxis] * Ap
+            x += gamma[:, np.newaxis] * p
+            r -= gamma[:, np.newaxis] * Ap
             
             # Check convergence
             delta = np.linalg.norm(r) / np.linalg.norm(b)
@@ -79,12 +79,10 @@ class SBL_CoFEM:
     def estimate_posterior(self):
         """Simplified E-step following Algorithm 1."""
         # Define matrix A = βΦ^T Φ + diag{α}
-        """def A(x):
-            # x has shape (batch_size, D)
-            batch_size = x.shape[0]
-            Phi_x = np.stack([self.Phi @ x[i] for i in range(batch_size)])
-            Phi_T_Phi_x = np.stack([self.Phi.T @ Phi_x[i] for i in range(batch_size)])
-            return self.beta * Phi_T_Phi_x + (self.alpha[np.newaxis, :] * x)  # Correct broadcasting"""
+        def A(x):
+            # x has shape (D, K+1)
+            Phi_T_Phi_x = self.Phi.T @ (self.Phi @ x)  # Shape: (D, K+1)
+            return self.beta * Phi_T_Phi_x + np.diag(self.alpha) @ x  # Use diagonal matrix multiplication
         
         # Sample Rademacher probes (K x D)
         K = self.num_probes
@@ -97,22 +95,22 @@ class SBL_CoFEM:
         # Set preconditioner if required
         if self.precondition:
             # M_inv = lambda x: 1 / (self.beta + self.alpha) * x
-            M_inv = lambda x: 1 / (1 + alpha / self.beta) * x
+            M_inv = lambda x: 1 / (1 + self.alpha / self.beta) * x
         else:
             M_inv = lambda x: x
 
         # Solve linear system
-        # X, _ = self._conj_grad(A, B, M_inv=M_inv)
+        X, _ = self._conj_grad(A, B, M_inv=M_inv)
         
        # Construct matrix A explicitly: A = βΦ^T Φ + diag{α}
-        PhiT_Phi = self.Phi.T @ self.Phi  # Shape: (D, D)
-        # A = self.beta * PhiT_Phi + np.diag(self.alpha)  # Shape: (D, D)
+        """PhiT_Phi = self.Phi.T @ self.Phi  # Shape: (D, D)
+        A = self.beta * PhiT_Phi + np.diag(self.alpha)  # Shape: (D, D)
         A = self.beta*PhiT_Phi + np.diag(self.alpha)  # Shape: (D, D)
     
         # Solve system AX = B^T
         # B has shape (K+1, D), so B^T has shape (D, K+1)
         # Result X will have shape (D, K+1)
-        X = np.linalg.solve(A, B)
+        X = np.linalg.solve(A, B)"""
         
         # Extract results
         mu = X[:,-1]  # Last row is μ
@@ -129,14 +127,10 @@ class SBL_CoFEM:
         
     def fit(self, track_iterations=np.arange(1, 1001, 100)):
         """Run CoFEM algorithm and track weight evolution."""
-        old_alpha = np.ones_like(self.alpha)
+        old_mu = np.ones(self.D)
         tracked_weights = np.zeros((len(track_iterations), self.D))
         
         for iter in range(self.max_iter):
-            if iter%50 == 0:
-                print(f"Iteration {iter+1}/{self.max_iter}")
-                change = np.log(np.max(np.abs(old_alpha - self.alpha)))
-                print(f"Current change: {change}")
             # E-step
             mu, s = self.estimate_posterior()
             
@@ -149,11 +143,15 @@ class SBL_CoFEM:
             self.maximize(mu, s)
             
             # Check convergence
-            change = np.max(np.abs(old_alpha - self.alpha))
+            change = np.max(np.abs(old_mu - mu))
+            if iter%1 == 0:
+                print(f"Iteration {iter+1}/{self.max_iter}")
+                print(f"Current change: {change}")
+
             if change < self.threshold:
                 print(f"Converged after {iter+1} iterations")
                 break
                 
-            old_alpha = self.alpha.copy()
+            old_mu = mu.copy()
         
         return mu, tracked_weights
