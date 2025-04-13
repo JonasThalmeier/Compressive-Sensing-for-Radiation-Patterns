@@ -1,53 +1,51 @@
-from synthetic_data import generate_synthetic_data  # Import the function
-# from EM_wo_SURE import SBL_EM  # Import the SBL_EM class
-from CoFEM_wo_SURE import SBL_CoFEM  # Import the SBL_EM class
+from synthetic_data import generate_synthetic_data
+from EM_wo_SURE import SBL_EM
+from CoFEM_wo_SURE import SBL_CoFEM
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-# Example usage
 if __name__ == "__main__":
+    # Generate synthetic data
     N = 10  # Length of time-domain signal
-    M = 30  # Length of frequency-domain signal (M > N)
+    D = 30  # Length of frequency-domain signal (D > N)
     rho = 0.1  # Sparsity factor
     sigma = 0.01  # Standard deviation of noise
-
-    t, Phi, w, e = generate_synthetic_data(N, M, rho, sigma)
-
-    print("Generated synthetic data:")
-    print("t (time-domain signal):", t)
-    print("Phi (Fourier transform matrix):", Phi)
-    print("w (sparse frequency-domain signal):", w)
-    print("e (noise):", e)
-
-    # Run SBL
-    track_iterations = np.arange(1, 1001, 10)  # Define tracking iterations
-    sbl = SBL_CoFEM(t, Phi, num_probes=10, max_iter=1000, threshold=1e-6, beta=1.0, precondition=False)  # Initialize SBL with EM algorithm
-    w_estimated, tracked_weights = sbl.fit(track_iterations)
+    threshold = 1e-2  # Convergence threshold
+    t, Phi, w_true, e = generate_synthetic_data(N, D, rho, sigma)
     
-    # Calculate and plot MSE evolution
-    mse_values = []
-    for weights in tracked_weights:
-        # Calculate reconstructed signal
-        t_reconstructed = Phi @ weights
-        # Calculate MSE
-        mse = np.mean(np.square(t - t_reconstructed))
-        mse_values.append(mse)
+    # Run both algorithms for comparison
+    track_iterations = np.arange(1, 1001, 10)
     
-    # Create the plot
-    plt.figure(figsize=(10, 6))
-    plt.plot(track_iterations, mse_values, 'b-o')
+    # Run CoFEM
+    sbl_cofem = SBL_CoFEM(t, Phi, num_probes=1000, max_iter=1000, threshold=threshold, beta=1/sigma**2, precondition=True)
+    w_cofem, tracked_weights_cofem = sbl_cofem.fit(track_iterations)
+    
+    # Run EM for comparison
+    sbl_em = SBL_EM(t, Phi, max_iter=1000, threshold=threshold)
+    w_em, tracked_weights_em = sbl_em.fit(track_iterations)
+    
+    # Calculate MSE evolution for both methods
+    mse_cofem = []
+    mse_em = []
+    
+    # Calculate MSE against true weights w_true
+    for weights_cofem, weights_em in zip(tracked_weights_cofem, tracked_weights_em):
+        mse_cofem.append(np.mean(np.square(w_true - weights_cofem)))
+        mse_em.append(np.mean(np.square(w_true - weights_em)))
+    
+    # Plot results
+    plt.figure(figsize=(12, 6))
+    plt.plot(track_iterations, mse_cofem, 'b-o', label='CoFEM', alpha=0.7)
+    plt.plot(track_iterations, mse_em, 'r-o', label='EM', alpha=0.7)
     plt.xlabel('Iteration')
-    plt.ylabel('MSE')
-    plt.title('Evolution of Signal Reconstruction MSE')
+    plt.ylabel('MSE (log scale)')
+    plt.title('Evolution of Weight Recovery MSE')
     plt.grid(True)
-    plt.yscale('log')  # Use log scale for better visualization
+    plt.yscale('log')
+    plt.legend()
     plt.show()
 
+    # Print final results
+    print(f"Final MSE (CoFEM): {mse_cofem[-1]:.6e}")
+    print(f"Final MSE (EM): {mse_em[-1]:.6e}")
 
-    # Print results
-    print("True weights:", w)
-    print("Estimated weights:", w_estimated)
-    print("MSE:", np.mean((w - w_estimated)**2))
-
-    

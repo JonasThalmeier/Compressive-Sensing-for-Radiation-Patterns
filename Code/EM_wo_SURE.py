@@ -10,21 +10,21 @@ class SBL_EM:
         
         Parameters:
             t: observed signal (N x 1)
-            Phi: measurement matrix (N x M)
+            Phi: measurement matrix (N x D)
             max_iter: maximum number of iterations
             threshold: convergence threshold
         """
         self.t = t
         self.Phi = Phi
-        self.N, self.M = Phi.shape
+        self.N, self.D = Phi.shape
         self.max_iter = max_iter
         self.threshold = threshold
         
         # Initialize hyperparameters
-        self.alpha = np.ones(self.M)  # Hyperparameters for precision of w
+        self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
         self.beta = 1.0  # Noise precision (1/sigma^2)
 
-        self.gamma = np.ones(self.M)  # Variances of weights
+        self.gamma = np.ones(self.D)  # Variances of weights
         self.sigma_squared = 1.0  # Noise variance
         
     def estimate_posterior(self):
@@ -52,7 +52,7 @@ class SBL_EM:
         # Update sigma_squared (noise variance)
         error = self.t - self.Phi @ mu
         N_eff = np.sum(self.gamma / (self.gamma + np.diag(Sigma)))
-        self.sigma_squared = (np.sum(np.square(error)) + self.sigma_squared * np.sum(np.ones(self.M)-np.diag(Sigma)/self.gamma)) / self.N
+        self.sigma_squared = (np.sum(np.square(error)) + self.sigma_squared * np.sum(np.ones(self.D)-np.diag(Sigma)/self.gamma)) / self.N
 
 
         
@@ -66,8 +66,8 @@ class SBL_EM:
             mu: final weight estimates
             tracked_weights: dictionary with weights at specified iterations
         """
-        old_gamma = np.zeros_like(self.gamma)
-        tracked_weights = np.zeros((len(track_iterations), self.M))
+        old_gamma = np.ones_like(self.gamma)
+        tracked_weights = np.zeros((len(track_iterations), self.D))
         
         for iter in range(self.max_iter):
             # E-step
@@ -82,7 +82,7 @@ class SBL_EM:
             self.maximize(mu, Sigma)
             
             # Check convergence
-            change = np.max(np.abs(old_gamma - self.gamma))
+            change = np.max(np.abs(1/old_gamma - 1/self.gamma))
             if change < self.threshold:
                 print(f"Converged after {iter+1} iterations")
                 break
