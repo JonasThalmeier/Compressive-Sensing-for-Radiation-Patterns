@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple, Optional
 
 class SBL_CoFEM:
-    def __init__(self, t, Phi, num_probes=10, max_iter=1000, threshold=1e-6, beta=1.0, precondition=False):
+    def __init__(self, t, Phi, num_probes=10, max_iter=1000, threshold=1e-6, beta=1.0):
         """
         Initialize SBL with CoFEM algorithm
         
@@ -22,9 +22,7 @@ class SBL_CoFEM:
         self.N, self.D = Phi.shape
         self.max_iter = max_iter
         self.threshold = threshold
-        self.num_probes = num_probes
-        self.precondition = precondition
-        
+        self.num_probes = num_probes        
         # Initialize hyperparameters
         self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
         self.beta = beta  # Noise precision (1/sigma^2)
@@ -33,48 +31,41 @@ class SBL_CoFEM:
         """Sample Rademacher probes {±1}."""
         return 2 * (np.random.rand(*size) > 0.5) - 1
     
-    def _conj_grad(self, A, b, M_inv=None, max_iters=1000, tol=1e-3):
+    def _conj_grad(self, A, B, max_iters=1000, tol=1e-3):
         """Parallel Conjugate Gradient solver following Algorithm 2."""
-        x = np.zeros_like(b)
-        r = b.copy()
-        if M_inv is None:
-            z = r
-        else:
-            z = M_inv(r)
-        # Initialize residual
-        p = r.copy()
+        # Pre-compute constant terms
+        X = np.zeros_like(B)
+        R = B.copy()
+        P = B.copy()
         
-        # Compute initial rho
-        rho = np.sum(r * z, axis=1)
+        # Use diagonal multiplication instead of matrix multiplication for M_inv
+        M_inv = 1.0 / (self.beta * np.sum(self.Phi**2, axis=0) + self.alpha)
+        W = M_inv[:, np.newaxis] * R  # Replace M_inv@R with element-wise multiplication
+        
+        # Keep dimensions with axis=0 and keepdims=True
+        rho = np.sum(R * W, axis=0, keepdims=True)
+        b_norm = np.linalg.norm(B, ord='fro')
         
         for u in range(max_iters):
-            # Apply matrix A
-            Ap = A(p)
-            
-            # Compute step size
-            pi = np.sum(p * Ap, axis=1)
+            Psi = A(P)
+            pi = np.sum(P * Psi, axis=0, keepdims=True)
             gamma = rho / pi
             
-            # Update solution and residual
-            x += gamma[:, np.newaxis] * p
-            r -= gamma[:, np.newaxis] * Ap
+            # In-place operations
+            X += P * gamma
+            R -= Psi * gamma
             
-            # Check convergence
-            delta = np.linalg.norm(r) / np.linalg.norm(b)
-            if delta <= tol:
-                return x, u + 1
-            
-            # Prepare for next iteration
+            # Faster convergence check
+            if np.linalg.norm(R, ord='fro') <= tol * b_norm:
+                return X
+                
+            # Apply preconditioner with element-wise multiplication
+            W = M_inv[:, np.newaxis] * R
             rho_old = rho
-            if M_inv is None:
-                z = r
-            else:
-                z = M_inv(r)
-            rho = np.sum(r * z, axis=1)
-            eta = rho / rho_old
-            p = z + eta[:, np.newaxis] * p
-            
-        return x, None
+            rho = np.sum(R * W, axis=0, keepdims=True)
+            P = W + P * (rho / rho_old)
+        
+        return X
 
     def estimate_posterior(self):
         """Simplified E-step following Algorithm 1."""
@@ -91,26 +82,19 @@ class SBL_CoFEM:
         # Define matrix B = [p1|p2|...|pK|βΦ^T y]
         beta_phi_T_y = (self.beta * self.Phi.T @ self.t).reshape((self.D, 1))  # Shape: (D, 1)
         B = np.hstack([probes, beta_phi_T_y])  # Shape: (D, K+1)
-        
-        # Set preconditioner if required
-        if self.precondition:
-            # M_inv = lambda x: 1 / (self.beta + self.alpha) * x
-            M_inv = lambda x: 1 / (1 + self.alpha / self.beta) * x
-        else:
-            M_inv = lambda x: x
 
         # Solve linear system
-        X, _ = self._conj_grad(A, B, M_inv=M_inv)
+        # X = self._conj_grad(A, B)
         
        # Construct matrix A explicitly: A = βΦ^T Φ + diag{α}
-        """PhiT_Phi = self.Phi.T @ self.Phi  # Shape: (D, D)
+        PhiT_Phi = self.Phi.T @ self.Phi  # Shape: (D, D)
         A = self.beta * PhiT_Phi + np.diag(self.alpha)  # Shape: (D, D)
         A = self.beta*PhiT_Phi + np.diag(self.alpha)  # Shape: (D, D)
     
         # Solve system AX = B^T
         # B has shape (K+1, D), so B^T has shape (D, K+1)
         # Result X will have shape (D, K+1)
-        X = np.linalg.solve(A, B)"""
+        X = np.linalg.solve(A, B)
         
         # Extract results
         mu = X[:,-1]  # Last row is μ

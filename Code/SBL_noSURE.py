@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     # Generate synthetic data
-    N = 10  # Length of time-domain signal
-    D = 30  # Length of frequency-domain signal (D > N)
+    N = 100  # Length of time-domain signal
+    D = 300  # Length of frequency-domain signal (D > N)
     rho = 0.1  # Sparsity factor
     sigma = 0.01  # Standard deviation of noise
-    threshold = 0  # Convergence threshold
+    threshold = 1e-6  # Convergence threshold
     max_iter = 200
     t, Phi, w_true, e = generate_synthetic_data(N, D, rho, sigma)
     
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     track_iterations = np.arange(1, max_iter+1, 10)
     
     # Run CoFEM
-    sbl_cofem = SBL_CoFEM(t, Phi, num_probes=1000, max_iter=max_iter, threshold=threshold, beta=1/sigma**2, precondition=True)
+    sbl_cofem = SBL_CoFEM(t, Phi, num_probes=1000, max_iter=max_iter, threshold=threshold, beta=1/sigma**2)
     w_cofem, tracked_weights_cofem = sbl_cofem.fit(track_iterations)
     
     # Run EM for comparison
