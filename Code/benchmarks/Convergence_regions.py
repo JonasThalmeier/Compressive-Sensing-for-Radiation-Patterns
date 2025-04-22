@@ -1,5 +1,5 @@
-from synthetic_data import generate_synthetic_data  # Import the function
-from EM_wo_SURE import SBL_EM  # Import the SBL_EM class
+from utils.synthetic_data import generate_synthetic_data  # Import the function
+from EM_algs.EM_wo_SURE import SBL_EM  # Import the SBL_EM class
 import numpy as np
 import matplotlib.pyplot as plt
 

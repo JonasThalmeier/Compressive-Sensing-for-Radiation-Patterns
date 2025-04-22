@@ -1,6 +1,6 @@
-from synthetic_data import generate_synthetic_data
-from EM_wo_SURE import SBL_EM
-from CoFEM_wo_SURE import SBL_CoFEM
+from utils.synthetic_data import generate_synthetic_data
+from EM_algs.EM_wo_SURE import SBL_EM
+from EM_algs.CoFEM_wo_SURE import SBL_CoFEM
 import numpy as np
 import matplotlib.pyplot as plt
 

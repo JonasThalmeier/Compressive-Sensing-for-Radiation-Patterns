@@ -1,5 +1,5 @@
 import numpy as np
-from synthetic_data import generate_synthetic_data
+from utils.synthetic_data import generate_synthetic_data
 """
 Algorithm according to paper 'Sparse Bayesian Learning for Basis Selection' from Wimpf & Rao
 """
