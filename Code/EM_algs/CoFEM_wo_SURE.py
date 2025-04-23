@@ -102,7 +102,8 @@ class SBL_CoFEM:
         
         # Compute variances sj = 1/K Σ(pk,j * xk,j)
         # s = np.mean(probes * x, axis=0)
-        s = (1 / self.beta) * np.clip(np.mean(probes * x, axis=1), 0, None)        
+        # s = (1 / self.beta) * np.clip(np.mean(probes * x, axis=1), 0, None)
+        s = np.clip(np.mean(probes * x, axis=1), 0, None)        
         return mu, s
     
     def maximize(self, mu: np.ndarray, s: np.ndarray):
