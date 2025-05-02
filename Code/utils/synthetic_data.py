@@ -1,6 +1,6 @@
 import numpy as np
 
-def generate_synthetic_data(N, D, rho, sigma, seed=42):
+def generate_synthetic_data(N, D, rho, sigma, seed=42, FFT=True):
     """
     Generate synthetic data t = Phi * w + e.
 
@@ -21,12 +21,14 @@ def generate_synthetic_data(N, D, rho, sigma, seed=42):
     np.random.seed(seed)
     
     # Step 1: Create Fourier transform matrix (D x D)
-    F = np.fft.fft(np.eye(D))  # Full Fourier transform matrix (complex-valued)
-    F = F / np.sqrt(D)  # Normalize the Fourier transform matrix
+    if FFT:
+        F = np.fft.fft(np.eye(D))/np.sqrt(D)  # Full Fourier transform matrix (complex-valued)
+    else:
+        F = np.sqrt(1/N)*np.random.randn(D, D)
 
     # Step 2: Select N rows randomly to form Phi (N x D)
     row_indices = np.random.choice(D, N, replace=False)
-    Phi = F[row_indices, :].real  # Use only the real part of the selected rows
+    Phi = F[row_indices, :]
 
     # Step 3: Generate sparse vector w (length D)
     w = np.zeros(D)

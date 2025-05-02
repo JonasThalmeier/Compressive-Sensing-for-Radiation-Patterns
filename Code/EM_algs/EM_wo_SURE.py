@@ -1,10 +1,11 @@
 import numpy as np
 from utils.synthetic_data import generate_synthetic_data
+_sentinel = object()
 """
 Algorithm according to paper 'Sparse Bayesian Learning for Basis Selection' from Wimpf & Rao
 """
 class SBL_EM:
-    def __init__(self, t, Phi, max_iter=1000, threshold=1e-6, beta=1.0):
+    def __init__(self, t, Phi, max_iter=1000, threshold=1e-6, beta_in=_sentinel):
         """
         Initialize SBL with EM algorithm
         
@@ -19,43 +20,39 @@ class SBL_EM:
         self.N, self.D = Phi.shape
         self.max_iter = max_iter
         self.threshold = threshold
+        self.beta_in = beta_in
         
         # Initialize hyperparameters
         self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
-        self.beta = beta  # Noise precision (1/sigma^2)
+        if beta_in is _sentinel:
+            self.beta = 1.0  # Noise precision (1/sigma^2)
+        else:
+            self.beta = beta_in
 
-        self.gamma = np.ones(self.D)  # Variances of weights
-        self.sigma_squared = 1/beta  # Noise variance
         
     def estimate_posterior(self):
         """E-step: Estimate posterior distribution of w"""
-        # Compute posterior covariance using gamma and sigma_squared
-        Sigma = np.linalg.inv(self.beta * self.Phi.T @ self.Phi + np.diag(1/self.gamma))
+        # Compute posterior covariance using alpha and sigma_squared
+        Sigma = np.linalg.inv(self.beta * self.Phi.T @ self.Phi + np.diag(self.alpha))
         # Compute posterior mean
         mu = self.beta * Sigma @ self.Phi.T @ self.t
         return mu, Sigma
     
     def maximize(self, mu, Sigma):
         """M-step: Update hyperparameters alpha and beta"""
-        # Update alpha (precision of weights)
-        # self.alpha = 1 / (np.square(mu) + np.diag(Sigma))
-        
+        # Update alpha (variance of weights)
+        self.alpha = 1/(np.square(mu) + np.diag(Sigma))
+
         # Update beta (noise precision)
-        # error = self.t - self.Phi @ mu
-        # gamma = np.sum(1 - self.alpha * np.diag(Sigma))
-        # self.beta = (self.N - gamma) / (np.sum(np.square(error)))
-
-
-        # Update gamma (variance of weights)
-        self.gamma = np.square(mu) + np.diag(Sigma)
+        if self.beta_in is _sentinel:
+            # Update alpha (precision of weights)
         
-        # Update sigma_squared (noise variance)
-        error = self.t - self.Phi @ mu
-        N_eff = np.sum(self.gamma / (self.gamma + np.diag(Sigma)))
-        # self.sigma_squared = (np.sum(np.square(error)) + self.sigma_squared * np.sum(np.ones(self.D)-np.diag(Sigma)/self.gamma)) / self.N
-        # self.beta = 1 / self.sigma_squared
+            error = self.t - self.Phi @ mu
+            sum = np.sum(1 - self.alpha * np.diag(Sigma))
+            #self.beta = (self.N - sum) / (np.sum(np.square(error)))
+            self.beta = self.N/(np.sum(np.square(error))+sum/self.beta)
 
-        
+
     def fit(self, track_iterations=np.arange(1, 1001, 100)):
         """Run EM algorithm and track weight evolution
         
@@ -83,7 +80,8 @@ class SBL_EM:
             
             # Check convergence
             change = np.max(np.abs(old_mu - mu))
-            if change < self.threshold:
+            MSE = np.linalg.norm(self.t-self.Phi@mu)/np.linalg.norm(self.t)
+            if change < 1e-2 and MSE<self.threshold:
                 print(f"Converged after {iter+1} iterations")
                 break
                 

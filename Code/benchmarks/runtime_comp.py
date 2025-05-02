@@ -12,17 +12,17 @@ def run_comparison(N, D, rho=0.1, sigma=0.01, threshold=1e-6, max_iter=200, repe
     em_time = 0
     for i in range(repetitions):
         # Generate data
-        t, Phi, w_true, e = generate_synthetic_data(N, D, rho, sigma)
+        t, Phi, w_true, e = generate_synthetic_data(N, D, rho, sigma, FFT=False)
         # Time CoFEM
         start_time = time.time()
         sbl_cofem = SBL_CoFEM(t, Phi, num_probes=10, max_iter=max_iter, 
-                            threshold=threshold, beta=1/sigma**2)
+                            threshold=threshold, beta_in=1/sigma**2)
         w_cofem, _ = sbl_cofem.fit(np.array([max_iter]))
         cofem_time += (time.time() - start_time)/repetitions
         
         # Time EM
         start_time = time.time()
-        sbl_em = SBL_EM(t, Phi, max_iter=max_iter, threshold=threshold)
+        sbl_em = SBL_EM(t, Phi, max_iter=max_iter, threshold=threshold, beta_in=1/sigma**2)
         w_em, _ = sbl_em.fit(np.array([max_iter]))
         em_time += (time.time() - start_time)/repetitions
     
@@ -30,11 +30,11 @@ def run_comparison(N, D, rho=0.1, sigma=0.01, threshold=1e-6, max_iter=200, repe
 
 if __name__ == "__main__":
     # Parameters
-    N_min, N_max = 10, 10000
+    N_min, N_max = 10, 500
     num_points = 10
     ratio = 3  # D = ratio * N
     rho = 0.1
-    sigma = 0.01
+    sigma = 1e-6
     
     # Create N values
     N_values = np.logspace(np.log10(N_min), np.log10(N_max), num_points, dtype=int)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     for N in N_values:
         D = ratio * N
         print(f"Running comparison for N={N}, D={D}")
-        cofem_time, em_time = run_comparison(N, D, rho, sigma, repetitions=3)
+        cofem_time, em_time = run_comparison(N, D, rho, sigma, repetitions=3,threshold=1e-2,max_iter=1000)
         cofem_times.append(cofem_time)
         em_times.append(em_time)
     

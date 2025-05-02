@@ -1,8 +1,9 @@
 import numpy as np
 from typing import Tuple, Optional
+_sentinel = object()
 
 class SBL_CoFEM:
-    def __init__(self, t, Phi, num_probes=10, max_iter=1000, threshold=1e-6, beta=1.0):
+    def __init__(self, t, Phi, num_probes=10, max_iter=1000, threshold=1e-6, beta_in=_sentinel):
         """
         Initialize SBL with CoFEM algorithm
         
@@ -22,10 +23,15 @@ class SBL_CoFEM:
         self.N, self.D = Phi.shape
         self.max_iter = max_iter
         self.threshold = threshold
-        self.num_probes = num_probes        
+        self.num_probes = num_probes
+        self.beta_in = beta_in
+
         # Initialize hyperparameters
         self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
-        self.beta = beta  # Noise precision (1/sigma^2)
+        if beta_in is _sentinel:
+            self.beta = 1.0  # Noise precision (1/sigma^2)
+        else:
+            self.beta = beta_in
         
     def _samp_probes(self, size: Tuple[int, ...]) -> np.ndarray:
         """Sample Rademacher probes {±1}."""
@@ -109,6 +115,13 @@ class SBL_CoFEM:
     def maximize(self, mu: np.ndarray, s: np.ndarray):
         """M-step: Update alpha following Algorithm 1."""
         self.alpha = 1.0 / (np.square(mu) + s)
+
+        # Update beta (noise precision)
+        if self.beta_in is _sentinel:
+            # Update alpha (precision of weights)
+            error = self.t - self.Phi @ mu
+            sum = np.sum(1 - self.alpha * s)
+            self.beta = self.N/(np.sum(np.square(error))+sum/self.beta)
         
     def fit(self, track_iterations=np.arange(1, 1001, 100)):
         """Run CoFEM algorithm and track weight evolution."""
@@ -129,11 +142,12 @@ class SBL_CoFEM:
             
             # Check convergence
             change = np.max(np.abs(old_mu - mu))
-            if iter%1 == 0:
+            MSE = np.linalg.norm(self.t-self.Phi@mu)/np.linalg.norm(self.t)
+            """ if iter%1 == 0:
                 print(f"Iteration {iter+1}/{self.max_iter}")
-                print(f"Current change: {change}")
+                print(f"Current change: {change}") """
 
-            if change < self.threshold:
+            if change < 1e-2 and MSE<self.threshold:
                 print(f"Converged after {iter+1} iterations")
                 break
                 
