@@ -1,0 +1,2493 @@
+Covariance-Free Sparse Bayesian Learning
+
+Alexander Lin, Student Member, IEEE, Andrew H. Song, Student Member, IEEE,
+Berkin Bilgic, and Demba Ba, Member, IEEE
+
+1
+
+2
+2
+0
+2
+
+r
+p
+A
+8
+
+]
+P
+S
+.
+s
+s
+e
+e
+[
+
+2
+v
+9
+3
+4
+0
+1
+.
+5
+0
+1
+2
+:
+v
+i
+X
+r
+a
+
+Abstract—Sparse Bayesian learning (SBL) is a powerful frame-
+work for tackling the sparse coding problem while also pro-
+viding uncertainty quantiﬁcation. The most popular inference
+algorithms for SBL exhibit prohibitively large computational
+costs for high-dimensional problems due to the need to maintain
+a large covariance matrix. To resolve this issue, we introduce a
+new method for accelerating SBL inference – named covariance-
+free expectation maximization (CoFEM) – that avoids explicit
+computation of the covariance matrix. CoFEM solves multiple
+linear systems to obtain unbiased estimates of the posterior
+statistics needed by SBL. This is accomplished by exploiting
+innovations from numerical linear algebra such as preconditioned
+conjugate gradient and a little-known diagonal estimation rule.
+For a large class of compressed sensing matrices, we provide
+theoretical justiﬁcations for why our method scales well in high-
+dimensional settings. Through simulations, we show that CoFEM
+can be up to thousands of times faster than existing baselines
+without sacriﬁcing coding accuracy. Through applications to
+calcium imaging deconvolution and multi-contrast MRI recon-
+struction, we show that CoFEM enables SBL to tractably tackle
+high-dimensional sparse coding problems of practical interest.
+
+I. INTRODUCTION
+
+S PARSE coding is a fundamental problem in signal pro-
+
+cessing that seeks a sparse solution z to the equation
+
+y = Φz + ε,
+
+(1)
+
+where z ∈ RD is a latent sparse vector, y ∈ RN is an observed
+measurement vector, Φ ∈ RN ×D is a known dictionary, and
+ε ∈ RN is an unknown noise vector.
+
+Sparse Bayesian learning (SBL) is an effective methodology
+for sparse coding. It has been employed in several popular
+models, such as sparse Bayesian regression [1], relevance
+vector machines [2], and Bayesian compressed sensing [3]–[5].
+The practical applications of SBL are numerous, encompassing
+diverse examples such as medical image reconstruction [6],
+[7], direction of arrival estimation [8], human pose estimation
+[9], structural health monitoring [10], seismic exploration [11],
+and visual tracking [12].
+
+SBL offers several advantages compared to other common
+approaches to sparse coding (e.g. (cid:96)0 or (cid:96)1 regularization). As
+a Bayesian method, SBL provides uncertainty quantiﬁcation
+and the ability to recover credible intervals over z instead of
+a single point solution. Moreover, SBL does not need to tune
+
+A. Lin and D. Ba are with the School of Engineering and Ap-
+plied Sciences, Harvard University, Cambridge, MA, 02138 USA (e-mail:
+alin@seas.harvard.edu; demba@seas.harvard.edu).
+
+A. H. Song is with the Electrical Engineering and Computer Science,
+Massachusetts Institute of Technology, Cambridge, MA, 02138 USA (email:
+andrew90@mit.edu).
+
+B. Bilgic is with Harvard-MIT Health Sciences and Technology, Mas-
+sachusetts Institute of Technology, Cambridge, MA, USA, Athinoula A.
+Martinos Center for Biomedical Imaging, Charlestown, MA, USA Department
+of Radiology, Harvard Medical School, Boston, MA, USA.
+
+regularization parameters since it can learn them or integrate
+them out using hyperpriors [4]. As a generative model, SBL
+can be embedded as a submodule within a larger framework to
+enforce more complex structure for z (e.g. group sparsity [13],
+block sparsity [14]). Finally, SBL has favorable optimization
+properties, such as a sparser global minimum than (cid:96)1 methods
+and fewer local minima than (cid:96)0 methods [15].
+
+One often-noted limitation of SBL is the heavy compu-
+tational cost of its inference algorithm [2], [6]. On the one
+hand, the fact that SBL requires more computation than non-
+Bayesian approaches should be unsurprising, since SBL re-
+covers an entire distribution instead of a single point estimate.
+On the other hand, the most widely-used options for SBL
+inference scale poorly to high-dimensional problems, which
+are becoming increasingly common in many domains. This
+limitation threatens to render the SBL paradigm obsolete for
+large-scale settings, as inference cannot be performed in an
+acceptable timeframe for practical applications.
+
+The principal inference procedure of SBL is the expectation-
+maximization (EM) algorithm [1], [2]. Each iteration of EM is
+computationally expensive, requiring O(D3)-time and O(D2)-
+space to invert a large covariance matrix, where D is the di-
+mension of the sparse codes. There have been several attempts
+to reduce the costs of EM, using iteratively reweighted least-
+squares (IRLS) [16], approximate message passing (AMP)
+[17], and variational inference (VI) [18]. A popular alternative
+to EM called the sequential algorithm (Seq) [19] is often faster
+in practice. However, these methods lack either scalability at
+very high dimensions D or accuracy in recovering ground-
+truth sparse codes when compared to EM.
+
+A. Contributions
+
+We introduce a novel method for accelerating SBL’s EM
+algorithm for high-dimensional problems. We call our method
+covariance-free expectation maximization (CoFEM) be-
+cause it eliminates the main bottleneck of EM – i.e. the storage
+and inversion of the covariance matrix. We demonstrate that
+CoFEM has signiﬁcant advantages in both scalability and
+accuracy over other SBL approaches (reviewed in Section II).
+Our contributions are categorized into four types – methodol-
+ogy (Section III), theory (Section IV), experimentation (Sec-
+tion V), and applications (Section VI).
+
+Methodology: We develop CoFEM, which solves multiple
+linear systems and exploits a little-known diagonal estimation
+rule to obtain unbiased estimates of the posterior moments
+needed by EM. The multiple systems can be solved in parallel
+using an iterative solver, such as the conjugate gradient (CG)
+algorithm, without constructing the covariance matrix. This
+simple, yet powerful principle reduces EM’s per-iteration time
+
+ 
+ 
+ 
+ 
+ 
+ 
+complexity from O(D3) to O(U KτD), where τD is the time
+needed for matrix-vector multiplication and U, K (cid:28) D are
+hyperparameters for the number of CG steps and the number
+of linear systems. Furthermore, CoFEM reduces EM’s space
+complexity from O(D2) to O(DK).
+
+Theory: We prove new theorems that further characterize
+CoFEM’s asymptotic complexities. In applying this theory to
+matrices Φ that satisfy the restricted isometry property (RIP)
+and commonly occur in compressed sensing applications, we
+show that, in the limit of a large number of EM iterations,
+CoFEM’s hyperparameters U and K can be kept small even
+as the dimensionality of the problem D grows very large. We
+use this theory to justify practical choices for U and K that
+need not increase with D, leading to signﬁcant computational
+savings compared to existing SBL algorithms.
+
+Experimentation: We perform simulations
+
+comparing
+CoFEM to several existing SBL algorithms [2], [16], [17],
+[18], [19], for high-dimensional sparse signal recovery. Across
+all of our settings, CoFEM is able to maintain the same level
+of accuracy as EM due to its unbiased estimation of poste-
+rior moments. In addition, CoFEM’s highly-parallelized and
+space-saving design enables further acceleration via graphics
+processing units (GPUs); most other approaches cannot fully
+realize this beneﬁt due to their heavy memory requirements. In
+practice, CoFEM with GPU acceleration can reduce hours of
+computation for covariance-based algorithms to a few seconds.
+Applications: We apply CoFEM-equipped SBL in two set-
+tings of practical interest: (1) calcium deconvolution and (2)
+multi-contrast MRI reconstruction. In these high-dimensional
+settings, CoFEM attains competitive computation time with
+non-Bayesian approaches, while providing several beneﬁts
+(e.g. superior performance, uncertainty quantiﬁcation). These
+applications require extensions of the SBL model to multi-task
+learning and to settings with non-negativity constraints, which
+we demonstrate CoFEM is ﬂexible enough to handle.
+
+II. SPARSE BAYESIAN LEARNING
+
+A. Generative Model
+
+To solve Eq. (1), SBL imposes the following model:
+
+z ∼ N (0, diag{α}−1),
+
+y | z ∼ N (Φz, 1/βI),
+
+(2)
+
+where β ∈ R is the inverse of the variance of the noise
+(commonly called precision) and I is the identity matrix. Given
+y, SBL performs inference on this model to recover z.
+
+The main identifying feature of SBL is the diagonal Gaus-
+sian prior with precision parameters α ∈ RD for z. The
+notation diag{α} in Eq. (2) maps α to a D × D matrix with
+α along its diagonal and zero elsewhere. SBL performs type
+II maximum likelihood estimation [20] by integrating out z
+and optimizing α. Thus, SBL learns a posterior distribution
+with uncertainty over z. The overall learning objective is:
+
+log p(y | α) = log
+
+(cid:90)
+
+p(y | z)p(z | α)dz.
+
+(3)
+
+max
+α
+
+z
+As this objective is optimized, many of the elements of α
+diverge to ∞. For these elements, the independent Gaussian
+
+2
+
+priors converge to point masses at zero, forcing their respective
+posteriors to follow suit. Thus, upon convergence of α to
+ˆα, the recovered posterior distribution p(z | y, ˆα) is often
+highly sparse. This phenomenon is called automatic relevance
+determination [15] because SBL learns which elements of z
+are “relevant” (i.e. non-zero) from the data.
+
+In the remainder of this section, we review several inference
+schemes that have been proposed to optimize Eq. (3) and
+comment on their respective shortcomings.
+
+B. Expectation-Maximization Algorithm
+
+Most SBL inference schemes are built on the expectation-
+maximization (EM) algorithm, a general framework for param-
+eter estimation in the presence of latent variables [2], [21]. EM
+iteratively alternates between an expectation step (E-Step) and
+a maximization step (M-Step). Let α(t) be the solution at the
+start of the t-th iteration. The E-Step computes the expectation
+Q(α; α(t)) of the complete data log-likelihood log p(z, y | α)
+with respect to the latent posterior p(z | y, α(t)):
+
+Q(α; α(t)) = E
+p(z | y,α(t))[log p(z, y | α)]
+= E
+p(z | y,α(t))[log p(z | α) + log p(y | z)]
+D
+(cid:88)
+
+∝
+
+log αj − αj · E
+
+p(z | y,α(t))
+
+(cid:2)z2
+
+j
+
+(cid:3) + const,
+
+(4)
+
+j=1
+
+where “const” absorbs all terms that are constant with respect
+to α. The posterior p(z | y, α(t)) is a multivariate Gaussian
+distribution N (µ, Σ) with mean and covariance parameters
+
+µ = βΣΦ(cid:62)y,
+
+Σ = (βΦ(cid:62)Φ + diag{α(t)})−1.
+
+(5)
+
+The second moment of each zj in Eq. (4) can be decomposed
+into a sum over the squared mean and variance, i.e.
+
+E
+p(z|y,α(t))[z2
+
+j ] = E
+= µ2
+
+p(z|y,α(t))[zj]2 + Varp(z|y,α(t))[zj]
+j + Σj,j,
+The M-Step updates each α(t)
+
+j by maximizing Eq. (4) with
+respect to αj. Given µ and Σ, this can be done in closed-form
+by differentiating Q:
+1
+αj
+
+j + Σj,j = 0 =⇒ α(t+1)
+
+1
+j + Σj,j
+
+∂Q
+∂αj
+
+− µ2
+
+, (7)
+
+(6)
+
+µ2
+
+=
+
+=
+
+j
+
+EM repeats Eqs. (5) and (7) for T iterations until convergence,
+while guaranteeing non-negative change in the log-likelihood
+objective of Eq. (3) at each step.
+
+Despite its simplicity, the EM algorithm is limited by its
+computational cost. The E-Step of Eq. (5) is expensive for
+large D. Storing Σ requires O(D2)-space and computing it
+through matrix inversion requires O(D3)-time. This makes the
+standard EM algorithm challenging at high dimensions.
+
+C. Previous Attempts to Accelerate EM
+
+There have been several attempts to accelerate the EM
+algorithm for SBL inference. One approach is based on
+iteratively reweighted least squares (IRLS) [16], which applies
+the Woodbury matrix identity to Σ in Eq. (5), yielding
+
+Σ = C − CΦ(cid:62)(I + ΦCΦ(cid:62))−1ΦC,
+
+(8)
+
+where C = diag{α(t)}−1. By inverting an N × N matrix (as
+opposed to a D × D matrix), IRLS reduces the per-iteration
+time complexity of EM to O(N 3 + N 2D). For problems in
+which N (cid:28) D, IRLS is more efﬁcient than EM. However, if
+N = O(D), the time complexity is still O(D3). Furthermore,
+like EM, IRLS requires storage of Σ, which remains an
+expensive O(D2)-space cost.
+
+Another line of work is based on variants of approximate
+message passing (AMP). AMP combines quadratic and Taylor
+series approximations with loopy belief propagation to iter-
+atively estimate the means and variances of z in Eq. (6),
+circumventing matrix inversion [17], [22]. Though faster than
+EM in practice, AMP is known to diverge for dictionaries Φ
+that do not satisfy zero-mean, sub-Gaussian criteria [23].
+
+A third common strategy is to employ variational inference
+(VI), which approximates the true posterior p(z | y, α) with a
+simpler surrogate q(z) [24]–[26]. This allows for SBL infer-
+ence that is inverse-free [18], [27]. However, VI approaches
+optimize a lower bound on Eq. (3) instead of the true log-
+likelihood objective. Thus, they may converge to a sub-optimal
+solution for α. Both AMP and VI are ultimately limited by
+the fact that their approximations to the means and variances
+of z can be biased for general dictionaries Φ [23], [27]. In
+Section III, we present a new method that ensures an unbiased
+estimation of these moments, regardless of the structure of Φ.
+
+D. Sequential Algorithm
+
+The sequential (Seq) algorithm, is a notable alternative to
+EM that reduces computation time and space in practice [3],
+[19]. Seq maintains a set S ⊆ {1, 2, . . . , D} of “active” indices
+such that αj is ﬁnite for each j ∈ S and αj = ∞ for all
+j (cid:54)= S. Initially, S = ∅. Indices are sequentially added to
+or deleted from S if making such a change can increase the
+log-likelihood objective (Eq. (3)).
+
+At any given point, Seq only needs to store parts of the mean
+vector µ and covariance matrix Σ corresponding to S; all other
+components are assumed to be zero. Thus, for truly sparse
+vectors z with d non-zero components such that d (cid:28) D,
+Seq is more efﬁcient than EM. Yet unlike EM, the number of
+iterations needed for Seq depends on d, since at least d steps
+must be taken to fully recover z. The overall time complexity
+is O(d2D) and the space complexity is O(d2 + D) [4].
+
+However, Seq has several limitations. It is often the case
+that d is a fraction or percentage of D. If d grows linearly
+with D, the asymptotic time cost is O(D3), similar to EM.
+This may explain why Seq can still be up to hundreds of times
+slower than non-Bayesian methods for large D [6]. Also, the
+algorithm’s sequential nature hinders its potential for speedup
+on parallel machines. Lastly, for large D, it remains costly to
+store parts of the quadratically-sized covariance matrix Σ.
+
+III. COVARIANCE-FREE EXPECTATION-MAXIMIZATION
+We introduce covariance-free expectation-maximization
+(CoFEM), a new SBL inference scheme for accelerating
+EM that removes the need to compute (let alone invert) the
+covariance matrix Σ. Our method is built on several advances
+from numerical linear algebra [28], [29].
+
+3
+
+Our key observation is that not all elements of Σ are needed
+for the M-Step in Eq. (7). Indeed, we only need µ (which
+depends on Σ via Eq. (5)) and the the diagonal elements of
+Σ to update ˆα. Thus, we propose a simpliﬁed E-Step that
+can estimate the two desired quantities {µj, Σj,j} for all j
+from solutions to linear systems, thereby avoiding the need
+for matrix inversion. We can re-express Eq. (5) for µ as
+
+Σ−1µ = βΦ(cid:62)y,
+
+(9)
+
+where Σ−1 = βΦ(cid:62)Φ + diag{α(t)}. Thus, µ is the solution x
+to the linear system Ax = b for A := Σ−1 and b := βΦ(cid:62)y.
+
+A. Diagonal Estimation
+
+We leverage a result from [28] to obtain the diagonal of Σ.
+Proposition 1 (Diagonal Estimation Rule). Let M ∈ RD×D
+be a square matrix. Let p1, p2, . . . , pK ∈ RD be random
+probe vectors, where each pk comprises independent and
+identically distributed elements such that E[pk,j] = 0 for all
+j = 1, . . . , D. For each pk, let xk = Mpk. Consider the
+estimator s ∈ RD, where, for each j = 1, . . . , D,
+
+sj =
+
+(cid:80)K
+
+k=1 pk,j · xk,j
+(cid:80)K
+k=1 p2
+k,j
+
+.
+
+(10)
+
+Then, each sj is an unbiased estimator of Mj,j.
+
+Proof. Consider sj, the j-th element of s. We have
+(cid:17)(cid:17)
+
+(cid:16)
+
+(cid:80)K
+
+k=1
+
+pk,j ·
+
+j(cid:48)=1 Mj,j(cid:48) · pk,j(cid:48)
+
+(cid:16)(cid:80)D
+
+(cid:80)K
+
+sj =
+
+k=1 p2
+k,j
+(cid:80)K
+k=1 pk,j · pk,j(cid:48)
+(cid:80)K
+k=1 p2
+k,j
+
+Mj,j(cid:48) ·
+
+= Mj,j +
+
+(cid:88)
+
+j(cid:48)(cid:54)=j
+
+.
+
+(11)
+
+Thus, E[sj] is equal to the following:
+
+
+
+K
+(cid:88)
+
+(cid:34)
+
+(cid:88)
+
+
+
+·E
+
+j(cid:48)(cid:54)=j
+
+Mj,j(cid:48) ·
+
+Mj,j +
+
+E[pk,j(cid:48)]
+(cid:124) (cid:123)(cid:122) (cid:125)
+=0
+where we have applied the fact that the j and j(cid:48) components of
+pk are independent to arrive at a product of expectations. Since
+E[pk,j(cid:48)] = 0 for all k and j(cid:48), it follows that E[sj] = Mj,j.
+
+(cid:80)K
+
+(12)
+
+k=1
+
+pk,j
+k=1 p2
+k,j
+
+(cid:35)
+ ,
+
+We apply this rule to Σ to estimate its diagonal elements.
+Following [28], we use the Rademacher distribution for draw-
+ing the probe vector pk, where each pk,j is either −1 or +1
+with equal probability. This simpliﬁes Eq. (10) to
+
+sj =
+
+1
+K
+
+K
+(cid:88)
+
+pk,j · xk,j.
+
+(13)
+
+k=1
+The diagonal estimation rule turns an explicit property of a
+matrix (i.e. the diagonal elements) into an implicit quantity
+that can be estimated without physically forming the matrix.
+To exploit this rule, we only need a method for applying Σ
+to each vector pk to obtain xk; this can be done by solving a
+linear system Ax = b, where A := Σ−1 and b := pk.
+
+In summary, the quantities {µj, Σj,j} needed for the sim-
+pliﬁed E-Step update can be obtained by solving K + 1
+
+j ← 1 for j = 1, . . . , D.
+
+Algorithm 1 COVARIANCEFREEEM(y, Φ, β, T , K)
+1: Initialize α(1)
+2: for t = 1, 2, . . . , T do
+// Simpliﬁed E-Step
+3:
+Deﬁne A ← βΦ(cid:62)Φ + diag{α(t)}.
+4:
+Draw p1, p2, . . . , pK ∼ Rademacher distribution.
+5:
+Deﬁne B ← [p1 | p2 | . . . | pK | βΦ(cid:62)y].
+6:
+[x1 | x2 | . . . | xK | µ] ← LINEARSOLVER(A, B).
+Compute sj ← 1/K (cid:80)K
+// M-Step
+if t < T then
+
+7:
+
+k=1 pk,j·xk,j for j = 1, . . . , D.
+
+Update α(t+1)
+
+j ← 1/(µ2
+
+j + sj) for j = 1, . . . , D.
+
+8:
+9:
+10:
+11:
+
+end if
+
+12:
+13: end for
+14: return α(T ), µ, s
+
+separate linear systems. These systems can be solved in
+parallel by considering the matrix equation AX = B with
+inputs A ∈ RD×D and B ∈ RD×(K+1) deﬁned as follows:
+
+A := βΦ(cid:62)Φ + diag{α(t)},
+B := (cid:2)p1 | p2 | . . . | pK | βΦ(cid:62)y(cid:3) .
+If we enumerate the columns of the solution matrix X ∈
+RD×(K+1) as x1, x2, . . . , xK, µ, then our desired quantities
+for the simpliﬁed E-Step are µ and s, as calculated by Eq.
+(13). We can then perform the M-Step update in Eq. (7) as
+
+(14)
+
+α(t+1)
+j
+
+=
+
+1
+j + sj
+
+µ2
+
+,
+
+(15)
+
+completely avoiding the need to compute or invert the covari-
+ance matrix Σ. Algorithm 1 gives the full CoFEM algorithm.
+The diagonal estimator in Eq. (13) is unbiased for any
+K ≥ 1, yet its variance is proportional to 1/K, as we will
+show in Section IV-A. We will provide theoretical justiﬁcation
+that small K sufﬁces for CoFEM in practice, and that this K
+can be constant with respect to the dimensionality D for a
+large class of compressed sensing matrices Φ.
+
+B. Parallel Conjugate Gradient
+
+Among potential options for the linear solver in Algorithm
+1, we choose the conjugate gradient (CG) algorithm due to
+its efﬁciency and ﬂexibility [29], [30]. CG is an iterative
+approach with a series of matrix-vector multiplication steps
+to solve a linear system Ax = b. At each step, CG does not
+need a physical manifestation of A; it only requires a way
+to apply A to an arbitrary vector v to yield Av. For SBL,
+A := βΦ(cid:62)Φ + diag{α(t)}, which implies the complexity of
+CG is dominated by the time τD it takes to apply Φ and its
+transpose to v. In many applications, Φ is a structured and
+matrix-free operation. Examples include convolution, discrete
+cosine transform, Fourier transform, and wavelet transform –
+all of which require at most τD = O(D log D)-time [31].
+
+CG can also easily generalize to solving multiple linear
+systems AX = B by simply replacing the matrix-vector
+multiplications with matrix-matrix multiplications. For faster
+computing, these operations can be parallelized on GPUs. In
+
+4
+
+addition, CG is space-efﬁcient and only needs O(D)-space to
+solve the linear system; this is the minimum requirement for
+any solver given that the output x ∈ RD.
+
+C. Preconditioning
+
+The time complexity of CG depends on the number of CG
+steps U . It is guaranteed that U ≤ D [29], yet D can be
+very large for high-dimensional problems. In general, if A has
+a small condition number κ(A) := λmax(A)/λmin(A) where
+λmax(A) and λmin(A) are the largest and smallest eigenvalues
+of A, then U (cid:28) D steps are needed to ﬁnd an ˆx such that
+(cid:107)Aˆx − b(cid:107)2/(cid:107)b(cid:107)2 ≤ (cid:15)max for small (cid:15)max. However, optimizing
+the SBL objective function pushes many diagonal elements of
+A to ∞, resulting in large κ(A) and necessitating large U .
+
+:= M−1/2b and x(cid:48)
+
+To resolve this issue, we incorporate a preconditioner matrix
+M ∈ RD×D in CG. Instead of directly solving Ax = b,
+we solve an equivalent system A(cid:48)x(cid:48) = b(cid:48), where A(cid:48)
+:=
+M−1/2AM−1/2, b(cid:48)
+:= M1/2x. We
+consider two criteria for choosing M in CoFEM. First, we
+want κ(A(cid:48)) (cid:28) κ(A) to reduce the number of steps U that are
+necessary to achieve small (cid:15)max. Next, we want to maintain
+the scalability of CoFEM (e.g. absence of matrix inversion,
+O(D)-space complexity) by avoiding a dense matrix for M.
+We thus propose to use a diagonal preconditioner M =
+diag{βθ + α(t)}, where θ ∈ RD is a set of customizable
+positive values. This M is easy to invert, only requires O(D)-
+space, and can be quickly applied to vectors. By varying θ,
+we can arrive at different choices for M. For example, setting
+θj = (cid:80)N
+i,j leads to the popular Jacobi preconditioner
+satisfying Mj,j = Aj,j [30]. In Section IV-B, we provide novel
+theoretical analysis for our diagonal preconditioner within
+the context of SBL. We illustrate that for a large class of
+compressed sensing dictionaries Φ, setting θj = 1 for all j is
+a favorable choice that leads to small κ(A(cid:48)) and enables U to
+be constant with respect to the dimensionality D.
+
+i=1 Φ2
+
+Algorithm 2 summarizes the parallel CG algorithm for
+inputs A ∈ RD×D, M ∈ RD×D, and B ∈ RD×Q, where
+Q is the number of parallel systems. For CoFEM, we have
+Q = K + 1. The computation is dominated by line 5, in
+which A is applied to vectors stored as columns of a matrix.
+
+D. Complexity Comparisons
+
+Each of the T iterations of CoFEM requires at most U
+steps of CG – in which we apply Φ (and Φ(cid:62)) in τD-time
+to K vectors – giving us an overall
+time complexity of
+O(T τDU K). CoFEM’s space complexity is dominated by CG,
+which requires O(D)-space for each of the (K + 1) systems.
+Table I shows the complexities of CoFEM and other SBL
+inference schemes. While many other methods improve upon
+EM, they introduce dependencies on N or d, which typically
+grow with D. For example, if the size of the signal z is
+doubled, we may also expect the number of measurements N
+to be doubled (to achieve same reconstruction error), as well
+as the number d of non-zero values in z. Thus, increasing D
+compounds the increase in complexities of these algorithms.
+In contrast, CoFEM’s dependencies on U and K can be held
+constant as D increases, which we demonstrate in Section V.
+
+Algorithm 2 PARALLELCONJGRADIENT(A, B, M, U, (cid:15)max)
+
+followed by a M-Step to combine these moments,
+
+5
+
+1: Initialize X as a D × Q matrix of all zeros.
+2: Initialize R ← B and P ← B and W ← M−1B.
+3: Compute ρq ← (cid:80)D
+j=1 Rj,q · Wj,q for q = 1, . . . , Q.
+4: for u = 1, 2, . . . , U do
+5:
+6:
+7:
+8:
+
+Compute Ψ ← AP. // Apply matrix.
+Compute πq ← (cid:80)D
+Compute γq ← ρq/πq for q = 1, . . . , Q.
+Update X ← X + PΓ, where Γ = diag{γ}.
+Update R ← R − ΨΓ, where Γ = diag{γ}.
+Let δ ← ||R||F /||B||F , where F is Frobenius norm.
+if δ ≤ (cid:15)max then
+return X
+
+j=1 Pd,q · Ψd,q for q = 1, . . . , Q.
+
+q ← ρq for q = 1, . . . , Q.
+
+end if
+Compute W ← M−1R. // Apply preconditioner.
+Let ρold
+Compute ρq ← (cid:80)D
+Compute ηq ← ρq/ρold
+q
+Update P ← R + PH, where H = diag{η}.
+
+j=1 Rj,q · Wj,q for q = 1, . . . , Q.
+
+for q = 1, . . . , Q.
+
+9:
+10:
+11:
+12:
+13:
+
+14:
+15:
+
+16:
+
+17:
+
+18:
+19: end for
+20: return X
+
+TABLE I
+COMPUTATIONAL COMPLEXITIES OF SBL INFERENCE SCHEMES.
+
+Method
+EM [2]
+IRLS [16]
+AMP [17]
+VI [18]
+Seq [19]
+CoFEM (ours)
+
+Time
+O(T D3)
+O(T (DN 2 + N 3))
+O(T DN Tamp)
+O(T τD)
+O(Dd2)
+O(T τDU K)
+
+Space
+O(D2)
+O(D2)
+O(DN )
+O(D)
+O(D + d2)
+O(DK)
+
+E. CoFEM for SBL Extensions
+
+To further highlight the ﬂexibility of CoFEM, we show how
+
+it can handle two common extensions of the SBL model.
+
+1) Multi-Task Learning: In multi-task learning, there are L
+different sparse vector recovery problems that one wishes to
+solve at once. These problems may have different observation-
+dictionary pairs (y1, Φ1), (y2, Φ2), . . . , (yL, ΦL), yet
+the
+tasks are related in the sense that their corresponding vectors
+z1, z2, . . . , zL have similar non-zero supports. Some exam-
+ples include multiple measurements vector (MMV) problems
+[32], multi-task compressed sensing [4], and sparse Bayesian
+learning with complex numbers [33].
+
+A simple way to enforce joint sparsity among all tasks in
+
+SBL is to have them share a common α vector:
+
+z(cid:96) ∼ N (0, diag{α}−1),
+y(cid:96) ∼ N (Φ(cid:96)z(cid:96), 1/βI),
+
+(cid:96) = 1, 2, . . . , L,
+
+(cid:96) = 1, 2, . . . , L.
+
+(16)
+
+Learning takes place through the task-separable objective:
+
+max
+α
+
+log p(y1, y2, . . . , yL | α) =
+
+L
+(cid:88)
+
+(cid:96)=1
+
+log p(y(cid:96) | α).
+
+(17)
+
+To optimize Eq. (17), EM runs a E-Step for each task (cid:96),
+µ(cid:96) = βΣ(cid:96)Φ(cid:62)
+
+(cid:96) Φ(cid:96) + diag{α(t)})−1,
+
+(cid:96) y(cid:96), Σ(cid:96) = (βΦ(cid:62)
+
+(18)
+
+.
+
+=
+
+(cid:80)L
+
+(19)
+
+α(t+1)
+j
+
+L
+(cid:96)=1 µ2
+(cid:96),j + Σ(cid:96),j,j
+To accelerate EM, CoFEM can simply replace the E-Step
+for each task (cid:96) with a covariance-free version, as described in
+Section III-A. We can further parallelize these L E-Steps by
+solving their L · (K + 1) systems all at once through Alg. 2.
+2) Non-Negativity Constraints: In some applications, we
+may want to enforce non-negativity on z. In these cases, we
+can use an independent rectiﬁed Gaussian prior N R(0, 1/αj)
+for each component zj of z [34], which places zero probability
+mass on the negative values. Speciﬁcally, we have
+
+p(zj | αj) =
+
+
+
+
+
+
+(cid:112)2αj/π exp(−αjz2
+1/2,
+0,
+
+j /2),
+
+zj > 0,
+zj = 0,
+zj < 0.
+
+(20)
+
+Due to conjugacy between the rectiﬁed Gaussian and Gaus-
+sian distributions, the posterior p(z | y, ˆα) is also a rectiﬁed
+Gaussian. However, this posterior’s density function is not
+analytically tractable, so we can follow [34] and approximate
+it with a diagonal rectiﬁed Gaussian whose second moment is
+
+(cid:114)
+
+E
+
+j ] = µ2
+
+p(z | y, ˆα)[z2
+
+j + Σj,j + µj ·
+
+Σj,j
+π
+where ξj = µj/(cid:112)2Σj,j and erfc(x) = 2/
+x exp(−t2)dt
+is the complimentary error function. To compute Eq. (21),
+CoFEM can replace Σj,j with sj from Eq. (13). The M-Step
+then updates αj as the reciprocal of Eq. (21).
+
+exp(−ξ2
+j )
+erfc(−ξj)
+π (cid:82) ∞
+
+(21)
+
+√
+
+,
+
+·
+
+IV. THEORETICAL ANALYSIS OF COFEM
+
+The two main hyperparameters of CoFEM are the number
+of probe vectors K and the number of conjugate gradient steps
+U . These values determine the per-iteration time complexity
+of CoFEM as O(U KτD) and its space complexity as O(DK).
+Thus, it is important to control U and K. In this section, we
+present new theoretical results illustrating that, for a large class
+of dictionaries Φ, these hyperparameters can be kept small
+even as the dimensionality of the problem D grows very large.
+The ultimate goal of SBL is to solve a Bayesian variant of
+the sparse coding problem in which we (a) identify which zj =
+0 and (b) provide uncertainty quantiﬁcation for the non-zero
+zj. To achieve true sparsity for a particular zj, it is necessary
+for its prior parameter αj → ∞, which is only attained as the
+number of iterations t → ∞. Thus, our study of U and K is
+based on the following SBL Convergence property:
+
+Deﬁnition 1 (SBL Convergence). In Alg. 1, consider the
+sequence of iterates α(t) for t = 1, 2, . . . , and let ˆα :=
+limt→∞ α(t). Then, (S, U, ˆα)-convergence is satisﬁed for SBL
+if the indices ND := {1, 2, . . . , D} can be partitioned into an
+“active” set S ⊆ ND and an “inactive” set U := ND \ S,
+where ˆαj > 0 is ﬁnite if j ∈ S and ˆαj = ∞ if j ∈ U.
+
+Of course, it is impossible to run t → ∞ iterations in prac-
+tice and to the best of the authors’ knowledge, there does not
+exist a formal proof characterizing EM’s behavior after ﬁnitely
+many iterations in the context of SBL. However, many works
+
+within the SBL literature [2]–[5] have illustrated (and even
+relied on) a well-accepted phenomenon in which the inactive
+αj grow very large and can be treated as “reaching inﬁnity”
+after T ﬁnite iterations. This justiﬁes the practical applicability
+of Deﬁnition 1 and our ensuing theoretical analysis.
+Notation For any positive integer P , let NP := {1, 2, . . . , P }.
+For any vector v ∈ RP and set B ⊆ NP , deﬁne the sub-
+vector vB := [vb | b ∈ B] ∈ R|B|. Similarly, for any
+matrix M = [v(1), . . . , v(P )] ∈ RQ×P , deﬁne the sub-matrix
+MB := [v(b) | b ∈ B] ∈ RQ×|B|. For any two sets A ⊆ NQ
+and B ⊆ NP , deﬁne the sub-matrix block MA,B := [v(b)
+A | b ∈
+B] ∈ R|A|×|B|. Let (cid:107)v(cid:107)2 denote the Euclidean norm of vector
+v(cid:62)Mv denote the M-weighted norm of
+v and (cid:107)v(cid:107)M :=
+v. Let (cid:107)M(cid:107)2 denote the spectral norm (i.e. largest singular
+value) of matrix M. Let σmin(M), λmax(M) and λmin(M)
+denote the smallest singular value, largest eigenvalue, and
+smallest eigenvalue of M, respectively. For a matrix M, let
+κ(M) := (cid:107)M(cid:107)2/σmin(M) be the condition number of M.
+
+√
+
+A. A Theory for the Number of Probe Vectors K
+
+First, we analyze the dependency of the diagonal estimator
+s on the number of probe vectors K. We aim to characterize
+the standard deviation (i.e. the square root of the variance) of
+each sj, which leads to this lemma:
+Lemma 1. Let M ∈ RD×D. Consider the estimator s deﬁned
+in Prop. 1, where p1, . . . , pK are independent Rademacher
+variables. Then, the standard deviation νj of sj is
+
+νj :=
+
+(cid:113)
+
+E[(sj − E[sj])2] =
+
+(cid:115) 1
+K
+
+(cid:88)
+
+j(cid:48)(cid:54)=j
+
+M2
+
+j,j(cid:48).
+
+(22)
+
+Proof. Within Eq. (22), we substitute the expression for sj
+from Eq. (11) and the fact that E[sj] = Mj,j to yield
+
+(cid:118)
+(cid:117)
+(cid:117)
+(cid:117)
+(cid:117)
+(cid:116)
+
+E
+
+νj =
+
+
+
+
+
+
+
+
+
+
+(cid:88)
+
+Mj,j(cid:48) ·
+
+j(cid:48)(cid:54)=j
+
+(cid:80)K
+
+k=1 pk,j · pk,j(cid:48)
+(cid:80)K
+k=1 p2
+k,j
+
+2
+
+
+
+
+
+
+
+
+(cid:118)
+(cid:117)
+(cid:117)
+(cid:117)
+(cid:116)
+
+E
+
+
+
+
+
+=
+
+(cid:88)
+
+(cid:88)
+
+Mj,j(cid:48) · Mj,j(cid:48)(cid:48) ·
+
+j(cid:48)(cid:54)=j
+
+j(cid:48)(cid:48)(cid:54)=j
+
+
+
+,
+
+gj,j(cid:48)
+gj,j
+
+·
+
+gj,j(cid:48)(cid:48)
+gj,j
+
+(23)
+
+where we deﬁne gj,(cid:96) := (cid:80)K
+k=1 pk,j · pk,(cid:96) for all (j, (cid:96)) ∈ ND ×
+ND. In the denominator, we have gj,j = K for all j since p2 =
+1 for a Rademacher variable. In the numerator, if j(cid:48) = j(cid:48)(cid:48), we
+have E[gj,j(cid:48) · gj,j(cid:48)(cid:48) ] = E[g2
+j,j(cid:48)] = K. Otherwise, if j (cid:54)= j(cid:48)(cid:48),
+E[gj,j(cid:48) · gj,j(cid:48)(cid:48) ] = 0. Thus, Eq. (23) simpliﬁes to Eq. (22).
+
+Lemma 1 tells us that the standard deviation of our estimator
+decreases with K and increases with the norm of the off-
+diagonal entries. Analyzing Lemma 1 within the context of
+SBL leads to our ﬁrst main theoretical result, as stated below.
+Theorem 1. Let Σ(t) := (βΦ(cid:62)Φ+diag{α(t)})−1 be the SBL
+covariance matrix at the t-th iteration of Alg. 1. Let s(t) be the
+Rademacher diagonal estimator for Σ(t) deﬁned in Eq. (13)
+with K probe vectors. Let ν(t)
+denote the standard deviation
+j
+
+6
+
+j . Assume that (S, U, ˆα)-convergence is satisﬁed. Then,
+
+of s(t)
+for any inactive index j ∈ U, we have
+
+lim
+t→∞
+
+ν(t)
+j = 0,
+
+(24)
+
+and for any active index j ∈ S, we have
+inf Θ∈O(cid:107)Θ−1Φ(cid:62)
+β · σ2
+
+ν(t)
+j ≤
+
+lim
+t→∞
+
+1
+√
+K
+
+·
+
+min(ΦS )
+
+S ΦS − I(cid:107)2
+
+,
+
+(25)
+
+where O is the set of |S| × |S| diagonal matrix with positive
+diagonal elements and I is the identity matrix.
+
+Theorem 1 offers several
+
+insights in the limit of EM
+iterations: (1) the estimator becomes deterministic with zero
+standard deviation for the inactive indices, (2) K only affects
+the estimator’s standard deviation for the active indices, and (3)
+if Φ(cid:62)
+S ΦS is close to any diagonal matrix Θ (i.e. the columns
+of ΦS are close to orthogonal), then the standard deviation
+for the active indices converge to a small quantity. The proof
+of Theorem 1 is given in Appendix A.
+
+B. A Theory for the Number of Conjugate Gradient Steps U
+Next, we analyze the number of CG steps U needed for con-
+vergence. We build on the following well-known result [30]:
+
+Lemma 2 (CG Convergence). Consider the CG algorithm for
+solving Ax = b, where A ∈ RD×D is a positive deﬁnite
+matrix and b ∈ RD. Let x0 ∈ RD be the initial solution. Let
+xu denote the algorithm’s solution and ru := b−Axu denote
+the algorithm’s residual at the u-th step of CG. Then,
+(cid:32) (cid:112)
+(cid:112)
+
+(cid:107)ru(cid:107)A−1 ≤ 2
+
+(cid:107)r0(cid:107)A−1,
+
+(26)
+
+(cid:33)u
+
+κ(A) − 1
+κ(A) + 1
+
+√
+
+r(cid:62)A−1r for any vector r ∈ RD.
+
+where (cid:107)r(cid:107)A−1 :=
+Corollary 1. Let CG with matrix A and any b ∈ RD start
+with the initialization x0 = 0. Let (cid:15) := (cid:107)rU (cid:107)A−1 /(cid:107)b(cid:107)A−1
+denote the relative residual error of CG after U steps1. Then,
+
+(cid:15) ≤ 2 exp(−U/
+
+(cid:112)
+
+κ(A)).
+
+(27)
+
+Proof. Since r0 = b, we can apply Eq. (26) to obtain
+(cid:33)U
+
+(cid:33)U
+
+(cid:32)
+
+(cid:15) ≤ 2
+
+(cid:32) (cid:112)
+(cid:112)
+
+κ(A) − 1
+κ(A) + 1
+
+≤ 2
+
+1 −
+
+.
+
+(28)
+
+1
+
+(cid:112)
+
+κ(A)
+
+The inequality 1 − 1/x ≤ exp(−1/x) holds for any x ∈ R.
+κ(A) in Eq. (28) gives the result.
+Taking x =
+
+(cid:112)
+
+Corollary 1 indicates that
+
+the relative residual error of
+CG decreases exponentially with U , yet the precise exponent
+depends on κ(A). In the t-th iteration of CoFEM, we wish to
+solve linear systems with A(t) := βΦ(cid:62)Φ+diag{α(t)}. How-
+ever, since α(t)
+j → ∞ for j ∈ U, this leads to κ(A(t)) → ∞
+and a vacuous bound on (cid:15) for any ﬁnite number of steps U .
+Therefore, CoFEM introduces a preconditioner M to construct
+
+1Theoretical results for CG often deﬁne (cid:15) in terms of the norm weighted
+by A−1 (or A), even though (cid:15)2 := (cid:107)rU (cid:107)2/(cid:107)b(cid:107)2 is used to determine
+convergence in software. We follow this convention while noting that one can
+exploit the relation (cid:15)2 ≤ (cid:15)(cid:112)κ(A) to extend our results for (cid:15)2.
+
+a new CG matrix A(cid:48)(t) with a reduced condition number. In
+our second main theoretical result, we analyze κ(A(cid:48)(t)), the
+bound that it induces on error, and the implications for U .
+Theorem 2. Let A(t) := βΦ(cid:62)Φ + diag{α(t)} denote the
+SBL inverse-covariance matrix at the t-th iteration of Alg.
+1. Let M(t) := diag{βθ + α(t)} denote the preconditioner,
+where θ ∈ RD is a vector of positive values. Deﬁne the
+preconditioned matrix A(cid:48)(t) := (M(t))−1/2A(t)(M(t))−1/2.
+Let b(t) ∈ RD be any vector and b(cid:48)(t) := (M(t))−1/2b(t). Let
+(cid:15)(t) be the relative residual error after running U conjugate
+gradient steps to solve the system A(cid:48)(t)x(cid:48)(t) = b(cid:48)(t) with
+x(cid:48)(t)
+
+0 = 0. Given (S, U, ˆα)-convergence, it follows that
+(cid:33)
+
+(cid:115)
+
+(cid:32)
+
+(cid:15)(t) ≤ 2 exp
+
+−U
+
+lim
+t→∞
+
+1 − (cid:107)Θ−1Φ(cid:62)
+1 + (cid:107)Θ−1Φ(cid:62)
+
+S ΦS − I(cid:107)2
+S ΦS − I(cid:107)2
+
+,
+
+(29)
+
+where Θ = diag{θS } and I is the identity matrix.
+
+Eq. (29) indicates that faster convergence is achieved for
+that minimizes (cid:107)diag{θS }−1Φ(cid:62)
+θS ∈ R|S|
+S ΦS − I(cid:107)2. In
+practice, the support S is not known in advance, so we may
+instead choose θ ∈ RD to minimize (cid:107)diag{θ}−1Φ(cid:62)Φ − I(cid:107)2.
+For example, if Φ(cid:62)Φ is a diagonal matrix (i.e. all columns
+of Φ are mutually orthogonal), then the optimal choice is
+θj = (cid:80)N
+i,j, which corresponds to the Jacobi precondi-
+tioner. The proof of Theorem 2 is given in Appendix B.
+
+i=1 Φ2
+
+C. A Theory for U and K for Compressed Sensing Matrices
+We now show that our bounds in Theorems 1 and 2 can
+be simpliﬁed for a large class of matrices Φ satisfying the
+restricted isometry property (RIP) and commonly employed
+in compressed sensing applications.
+Deﬁnition 2 (Restricted Isometry Property). Let Φ ∈ RN ×D,
+d ≤ D, and δ > 0. Then, Φ satisﬁes (d, δ)-RIP if for every
+set C ⊆ {1, . . . , D} of size |S| = d and every vector v ∈ Rd,
+
+(1 − δ)(cid:107)v(cid:107)2
+
+2 ≤ (cid:107)ΦCv(cid:107)2
+
+2 ≤ (1 + δ)(cid:107)v(cid:107)2
+2.
+
+(30)
+
+Corollary 2. Let Φ ∈ RN ×D satisfy (d, δ)-RIP. For any C ⊆
+ND with |C| = d, let ∆C,C := Φ(cid:62)
+C ΦC −I. Then, (cid:107)∆C,C(cid:107)2 ≤ δ.
+Proof. From Eq. (30), we have for any vector v ∈ Rd,
+
+1 − δ ≤
+
+C ΦCv
+
+v(cid:62)Φ(cid:62)
+v(cid:62)v
+
+≤ 1 + δ =⇒
+
+(cid:12)
+(cid:12)
+(cid:12)
+(cid:12)
+
+v(cid:62)∆C,Cv
+v(cid:62)v
+
+(cid:12)
+(cid:12)
+(cid:12)
+(cid:12)
+
+≤ δ.
+
+(31)
+
+Eq. (31) bounds the Rayleigh quotient (and eigenvalues) of
+∆C,C between [−δ, δ]. The spectral norm of a symmetric
+matrix is equal to its largest absolute eigenvalue.
+Corollary 3. In Theorem 1, let Φ ∈ RN ×D satisfy (d, δ)-RIP,
+where d = |S|. Then, for j ∈ S, the standard deviation of the
+diagonal estimator ν(t)
+j
+
+satisﬁes
+
+lim
+t→∞
+
+ν(t)
+j ≤
+
+1
+√
+K
+Proof. In Eq. (25), take Θ = I, which reduces the numerator
+to (cid:107)Φ(cid:62)
+S ΦS − I(cid:107)2. By Corollary 2, this quantity is at most δ.
+Finally, by Deﬁnition 2, σ2
+
+δ
+β(1 − δ)
+
+min(ΦS ) ≥ (1 − δ).
+
+(32)
+
+·
+
+.
+
+7
+
+Corollary 4. In Theorem 2, let Φ ∈ RN ×D satisfy (d, δ)-RIP,
+where d = |S|. Let θj = 1 for all j ∈ ND. Then, the relative
+residual error (cid:15)(t) of conjugate gradient satisﬁes
+
+(cid:32)
+
+(cid:15)(t) ≤ 2 exp
+
+−U
+
+lim
+t→∞
+
+(cid:114)
+
+(cid:33)
+
+.
+
+1 − δ
+1 + δ
+
+(33)
+
+Proof. This follows from applying Corollary 2 to Eq. (29).
+
+One may have expected that as N and D increase, CoFEM’s
+hyperparameters U and K must also increase proportionally
+to ensure that νj and (cid:15) remain small. However, Corollaries 3
+and 4 illustrate that for RIP matrices2, the bounds on U and K
+only depend on δ (not N or D). In compressed sensing, δ can
+be small even as N and D grow very large [35]. In Section
+V, we use this insight to demonstrate that even for very large
+D, CoFEM can accurately perform sparse coding with small
+constant values for U and K.
+
+V. SIMULATED EXPERIMENTS
+
+In this section, we run a series of experiments to compare
+the accuracy and scalability of CoFEM to that of other SBL
+inference methods across a broad range of different settings.
+
+A. Experimental Setup
+
+1) General Structure: We design all simulations with a
+structure inspired by Section V-A of [3]. We form a ground-
+truth latent vector z∗ ∈ RD of spikes by drawing d of its
+components from a distribution P and setting the other D − d
+components to zero. The location of the spikes are chosen
+uniformly at random. Given a dictionary Φ ∈ RN ×D, the
+observed data y ∈ RN is generated as y = Φz∗ + ε,
+where ε ∼ N (0, σ2I) ∈ RN with σ = 0.01. The goal
+is to apply SBL for reconstructing z∗. Success is measured
+through minimization of normalized root mean squared error
+(NRMSE), ||ˆz −z∗||2/||z∗||2 ×100, where ˆz = µ is the mean
+of the distribution p(z | y, ˆα) upon convergence.
+
+2) Dictionary: We consider three types of dictionaries Φ:
+• Dense Gaussian: We draw each element Φi,j indepen-
+dently from N (0, 1/N ) to form a dense matrix Φ. The
+spike distribution of z∗ is P := Uniform(−2, 2).
+
+• DCT: We let Φ = MΩ−1, where Ω ∈ RD×D is the
+matrix corresponding to the 1D discrete cosine transform
+of size D and M ∈ RN ×D is an undersampling operator
+that selects N out of D components (where N ≤ D).
+The spike distribution is P := N (0, 5).
+
+• Convolutional: We set N = D and Φ ∈ RD×D to
+a convolution in which its columns are delayed (and
+truncated) repetitions of an exponentially decaying ﬁlter
+φ ∈ RD. That is, φj := (1 − ρ)j−1 for 0 < ρ < 1. Thus,
+Φ is a lower triangular matrix in which the j-th column is
+a concatenation of j − 1 zeros and {φ1, . . . , φN −(j−1)}.
+The spike distribution is P := Exponential(1.5).
+
+2RIP is one mathematical notion for the idea of “close to orthonormality”
+for a set of dictionary columns. There exist other notions (e.g. incoherence,
+null space property) [35]. We conjecture there are bounds similar to Corol-
+laries 3 and 4 that hold for matrices that satisfy these other properties.
+
+8
+
+Fig. 1. Comparing the accuracy of different SBL inference schemes. Each point represents the mean of 25 trials.
+
+B. Accuracy Analysis
+
+For our ﬁrst analysis, we ﬁx D = 1024 and evaluate the
+accuracy of various SBL inference schemes across different
+settings. We compare among EM/IRLS [2], AMP [17], VI
+[18], Seq [19], and CoFEM. Note that EM and IRLS always
+yield the same result; IRLS is just the Woodbury identity (Eq.
+(8)) applied to EM. All EM-based methods (EM/IRLS, AMP,
+VI, CoFEM) are executed for T = 50 iterations. AMP employs
+Tamp = 10 inner loops. For CoFEM, Corollary 3 tells us that
+we can keep the number of probes K very small since δ ≈ 0
+and β = 1/(0.01)2 = 10,000. We use K = 20 probe vectors,
+though we have found that even smaller values for K do not
+change the results. We employ U = 400 maximum CG steps
+with early termination if the residual error drops below the
+threshold (cid:15)max = 10−4. Results are displayed in Fig. 1.
+
+1) Performance vs. Sparsity:
+
+In Fig. 1(a), we consider
+the dense Gaussian dictionary with N = (cid:98)D/4(cid:99), which is
+typical in a compressed sensing setting. Let the sparsity factor
+f ∈ [0, 1] determine the number of non-zero coefﬁcients in the
+latent signal z∗ as d = (cid:98)f · D(cid:99). We vary f and observe its
+impact on NRMSE. At low f , all algorithms perform well
+except VI. As f increases, EM/IRLS, AMP, and CoFEM
+exhibit the same decay in performance, while Seq decays more
+rapidly. In Fig. 1(b), we consider the DCT dictionary with
+N = (cid:98)D/3(cid:99) measurements, again varying f . We see the same
+overall trend as in Fig. 1(a). In Fig. 1(c), we compare NRMSE
+versus sparsity level f for the convolutional dictionary. The
+decay rate is set to ρ = 0.04. EM/IRLS, Seq, and CoFEM have
+near-perfect NRMSE at all f . However, VI fails again due to
+its biased objective and AMP fails due to the convolutional
+dictionary not being zero-mean and sub-Gaussian.
+
+2) Performance vs. Undersampling: In Fig. 1(d), we revisit
+the Gaussian dictionary and ﬁx f = 0.06. We vary the
+undersampling rate r > 0, where N = (cid:98)D/r(cid:99). We see that
+EM/IRLS, AMP, and CoFEM have similar performance at all
+
+r, while VI and Seq degrade more rapidly with increasing r.
+A similar trend is shown in Fig. 1(e), in which we vary r for
+the DCT dictionary while ﬁxing f = 0.12.
+
+3) Performance vs. Decay Rate: Finally, in Fig. 1(f), we
+consider the convolutional dictionary with ﬁxed f = 0.2 and
+vary the decay factor ρ. Smaller ρ leads to slower decay of the
+exponential ﬁlter, which increases the correlations between the
+columns of Φ. We observe that EM/IRLS, Seq, and CoFEM
+are all robust to changes in ρ. The performance of VI is heavily
+correlated with ρ, while AMP diverges for all values of ρ.
+
+CoFEM is the only algorithm that is as robust as EM/IRLS
+to changes in sparsity level, undersampling rate, and correla-
+tion between dictionary columns. We attribute this robustness
+to the fact that CoFEM performs an unbiased estimation of
+the posterior variances, regardless of the dictionary structure.
+
+C. Scalability Analysis
+
+We now analyze the scalability of CoFEM and other al-
+gorithms, by considering how computation time and memory
+requirements change as D is increased. In all settings, CoFEM
+has K = 20 probes and U = 400 maximum CG steps (with
+(cid:15)max = 10−4), regardless of D. The preconditioner employs
+θj = 1 for all j. Results are in Fig. 2.
+
+1) CoFEM vs. EM-based Algorithms: We begin by com-
+paring CoFEM against the other EM-based algorithms (EM,
+IRLS, AMP). In each setting, we run each EM-based algorithm
+for T = 30 EM iterations, as this is sufﬁcient to obtain low
+NRMSE (i.e. < 2%). VI is omitted because it is unable to
+reach this threshold in many cases, as illustrated by Fig. 1.
+
+For our ﬁrst setting (Fig. 2(a)), we consider the dense
+Gaussian Φ with D = 2p for p = {9, 10, . . . , 15}. For each
+D, we let N = (cid:98)D/4(cid:99) and d = (cid:98)0.06D(cid:99). As D increases, we
+observe that CoFEM becomes faster than EM by an order of
+magnitude. CoFEM is slower than AMP and IRLS, yet the gap
+decreases for large D. This is because it takes τD = O(DN )-
+time to apply a dense Φ to a vector, so CoFEM has the same
+
+0.020.040.060.080.100.120.14Sparsity Factor020406080100NRMSE (%)(a) Performance vs. Sparsity (Gaussian)0.030.060.090.120.150.180.21Sparsity Factor020406080100NRMSE (%)(b) Performance vs. Sparsity (DCT)0.050.100.150.200.250.300.35Sparsity Factor020406080100NRMSE (%)(c) Performance vs. Sparsity (Convolutional)12345678Undersampling Factor020406080100NRMSE (%)(d) Performance vs. Undersampling Factor (Gaussian)12345678Undersampling Factor020406080100NRMSE (%)(e) Performance vs. Undersampling Factor (DCT)0.020.040.060.080.100.120.14Decay Rate020406080100NRMSE (%)(f) Performance vs. Decay Rate (Convolutional)EM/IRLSAMPVISeqCoFEM9
+
+Fig. 2. Comparing the scalability of different SBL inference schemes on log-log scales. Some lines omit points for high dimensions due to memory issues.
+
+asymptotic complexity as AMP for the dense case (see Table
+I). Furthermore, due to its space-saving and parallelization-
+friendly design, CoFEM can exploit a GPU3 to be up to 7×
+faster than IRLS/AMP and 100× faster than EM.
+
+Next, in Fig. 2(b) and Fig. 2(c), we repeat the experiment
+of increasing D for the two structured Φ (DCT and convolu-
+tional). In both cases, there are fast algorithms for applying Φ
+to an arbitrary vector in τD = O(D log D)-time. As a result,
+CoFEM is faster at high D than all other algorithms. In the
+DCT case, we let d = (cid:98)0.12D(cid:99) and N = (cid:98)D/3(cid:99) for all D.
+We observe that CoFEM can be faster than EM by up to 360×
+on the CPU and 3800× on the GPU, reducing over two hours
+of computation for EM at D = 215 to two seconds. In the
+convolutional case, we let d = (cid:98)0.2D(cid:99). For D = 215, EM and
+IRLS have memory issues due to the large N = D. AMP is
+unable to yield a sensible solution (see Fig. 1(c)). In contrast,
+CoFEM (on both CPU and GPU) is accurate while being faster
+than EM/IRLS and not experiencing memory issues at high D.
+2) CoFEM vs. Seq: Finally, we compare CoFEM to the
+sequential algorithm. Both of these algorithms have low space
+complexity (see Table I), preventing memory issues at very
+high D. Since CoFEM and Seq have different optimization
+procedures, we run both algorithms until
+they reach 2%
+NRMSE. We repeat the experimental settings from Fig. 2(a)-
+(c) at higher dimensions D = 2p for p = {12, 13, . . . , 18}.
+
+For the dense dictionary (Fig. 2(d))4, we observe that Seq
+is faster than CoFEM on the CPU for low D, but the gap
+decreases for high D. On the GPU, CoFEM is faster than Seq
+at moderate D due to its greater ability to exploit parallelized
+hardware. For the two structured dictionaries (Fig. 2(e) and
+2(f)), CoFEM is faster across all settings. We further observe
+that for many of the larger dimensions, Seq inevitably encoun-
+
+3We use a 16-GB Nvidia T4 GPU and a 32-GB, 2.3 GHz Intel Xeon CPU.
+4We could not run D > 216 for the dense case because there is not enough
+
+memory on our devices to store all the entries of Φ.
+
+Fig. 3. Empirical insights into U and K based on theory of CoFEM.
+
+ters memory issues as a covariance-based method. In contrast,
+CoFEM has no such issue due to its low space complexity.
+For example, at D = 218, CoFEM can leverage the GPU to
+be 5000× faster than Seq. In summary, CoFEM’s ability to
+obviate covariance computation provides many advantages in
+terms of scalability over existing SBL inference schemes.
+
+We emphasize that across all of our experiments, U and
+K are kept at small values despite substantially increasing D,
+demonstrating CoFEM’s scalability at very high dimensions.
+
+D. Empirical Insights from the Theory of CoFEM
+
+Finally, we give some insights into our theory for CoFEM’s
+hyperparameters U and K (Section IV). We use the DCT dic-
+tionary setup of Section V-A with N = (cid:98)D/3(cid:99) measurements.
+In Fig. 3(a), we let D = 1024 and plot the relationship
+between (1) the number of probes K and (2) the maximum
+standard deviation maxD
+over all D coordinates of the
+diagonal estimator at iteration T = 50 of CoFEM. We present
+a “theoretical” curve calculated using Theorem 1 with Θ =
+I and an “empirical” curve in which each ν(T )
+is estimated
+through the empirical standard deviation of 1000 Monte Carlo
+trials. Fig. 3(a) shows that our theoretical bound (1) captures
+
+j=1 ν(T )
+
+j
+
+j
+
+29210211212213214215Dimensionality101100101102103104Time (sec)(a) Time for 30 Iterations (Dense)29210211212213214215Dimensionality101100101102103104Time (sec)(b) Time for 30 Iterations (DCT)29210211212213214215Dimensionality101100101102103104Time (sec)(c) Time for 30 Iterations (Convolutional)212213214215216Dimensionality100101102103Time (sec)(d) Time to Achieve 2% Error (Dense)212213214215216217218Dimensionality100101102103104105Time (sec)(e) Time to Achieve 2% Error (DCT)212213214215216217218Dimensionality100101102103104Time (sec)(f) Time to Achieve 2% Error (Convolutional)EMIRLSAMPSeqSeq (gpu)CoFEMCoFEM (gpu)10203040Number of Probes12345Max Stan Dev of Estimator1e4(a) Stan Dev vs. Probes (K)TheoreticalEmpirical (iter = 50)29210211212213214215Dimensionality02004006008001000Num CG Steps to Reach 1e-4 Error(b) CG Steps (U) vs. DimensionalityNo precon (iter 50)No precon (iter 100)Precon (iter 50)Precon (iter 100)10
+
+Fig. 4. Results of running SBL-CoFEM for calcium imaging and comparison with FOOPSI.
+
+the true decay of the standard deviation as a function of K
+and (2) accurately upperbounds the empirical curve after T
+ﬁnite iterations despite Theorem 1’s condition of T → ∞.
+
+In Fig. 3(b), we consider different orders of magnitude for
+D and plot the number of CG steps U needed to achieve
+small error (cid:15)max = 10−4 at the T = 50-th and T = 100-th
+iterations of CoFEM. We explore the impact of our diagonal
+preconditioner (Section III-C) on U . The ﬁgure reveals that our
+theoretical insights from Section IV-B and Theorem 2 hold
+in practice: (1) when there is no preconditioner and (cid:15)max is
+ﬁxed, U needs to grow substantially with increasing iterations
+T and/or dimensionality D, yet (2) when a preconditioner is
+used, U can be small and constant for large T and large D.
+
+VI. REAL-DATA EXPERIMENTS
+
+We now demonstrate the utility of CoFEM for two real data
+applications – calcium deconvolution and MRI reconstruction.
+
+A. Calcium Deconvolution
+
+Calcium imaging is a widely used tool in neuroscience
+for monitoring the electrical activity of neurons [36]. It is
+a method for indirectly observing the spiking activity of a
+neuron through a ﬂuorescence trace y ∈ RD, approximated
+as the convolution of an intrinsically sparse spiking pattern
+z∗ ∈ RD with a decaying calcium response φ ∈ RD. In
+calcium deconvolution, we aim to recover z∗ from y and φ.
+1) SBL Model: We can cast calcium deconvolution as a
+SBL problem with a dictionary Φ ∈ RD×D consisting of
+delayed (and truncated) versions of φ as its columns, similar
+to the setting in Section V-A2. The data is then assumed to be
+generated as y = Φz∗ +ε, where each εi ∼ N (0, 1/β). Since
+z∗ for calcium deconvolution is a non-negative vector, we
+employ SBL with non-negativity constraints (Section III-E2).
+2) Spike Inference: We use the CoFEM inference algorithm
+adapted for non-negativity constraints. Since Φ represents a
+discrete-time convolution, we can efﬁciently apply Φ to any
+vector v through fast Fourier transforms and an element-
+wise product. Non-negative SBL yields a rectiﬁed Gaussian
+posterior p(z | y, ˆα) over the latent spikes z. To obtain a
+point estimate ˆz, we ﬁnd a ﬁltered mode.Speciﬁcally, we ﬁrst
+ﬁlter z by selecting components zj that are highly likely to
+
+be non-zero, i.e. zj such that p(zj = 0 | y, ˆα) < q, where
+q is some small percentile (e.g. 0.05, 0.01). This query is
+possible only because SBL models uncertainty in z. Setting
+the unselected components of z to zero, we then ﬁnd the most
+likely values for all selected zj’s according to the posterior,
+resulting in ˆz. More details can be found in Appendix C-1.
+This is analogous to thresholding heuristics commonly used
+by (cid:96)1-based sparse coding algorithms [37]. However, unlike
+those value-based strategies, the percentile ﬁltering for SBL is
+value-agnostic and instead operates on the learned posterior.
+3) Data and Hyperparameters: We apply SBL to ﬁve
+ﬂuoresence traces from the GENIE dataset [38]. Each y
+contains data at a sampling rate of ν = 60 Hz for a total
+of D = 14,400 time points, which is a high-dimensional
+problem. The response φ has φi = (1 − ψ)i−1 for ψ =
+1/(ν × 0.7) = 0.0238, a widely-used value for the calcium
+indicator GCaMP6f. CoFEM employs T = 20, K = 20 and
+U = 400. The noise precision β is estimated from y through
+a Fourier domain procedure, as described in [39]. To obtain
+ˆz, we use a ﬁlter percentile of q = 0.05.
+
+4) Results: To evaluate ˆz, we employ the following stan-
+dard practice [39]: The GENIE dataset has ground-truth times
+for neural spikes. Let z∗ ∈ RD be a zero-one vector indicating
+when true spiking occurred. For bin length b, we reduce z∗
+and ˆz to vectors c∗ and ˆc of length (cid:100)D/b(cid:101) by summing across
+windows of b consecutive components. We then compute the
+Pearson correlation coefﬁcient ρb between c∗ and ˆc. A high
+value for ρb indicates agreement between ˆz and z∗.
+
+Fig. 4(a) plots sample SBL-CoFEM outputs and compares
+its inferred spike times with the ground truth. Fig. 4(b) shows
+an averaged curve over the ﬁve traces of ρb versus b at various
+bin lengths b ∈ {10, 20, 30, 40, 50, 60} for SBL-CoFEM and
+a popular (cid:96)1-based method called FOOPSI [40]. The ﬁgure
+shows that SBL-CoFEM outperforms FOOPSI, with the gap
+growing for larger bin sizes b.
+
+B. Multi-Contrast MRI Reconstruction
+
+Magnetic resonance imaging (MRI) is one of the dominant
+modalities for imaging the human body [41]. The standard data
+acquisition practice samples a set of points (called “k-space”)
+k ∈ CN from the two-dimensional Fourier transform (2DFT)
+
+01000020000300004000050000Time(ms)0.00.51.01.5Fluoresence(a)RawCalciumImagingDataandSBL-CoFEMDenoisedReconstructionRawData(y)SBL-CoFEMRecon(Φˆz)SBL-CoFEMSpikeTimesGround-TruthSpikeTimes102030405060BinLength(b)0.860.870.880.890.900.910.92CorrelationwithGround-Truth(ρb)(b)CorrelationatDifferentBinLengthsFOOPSISBL-CoFEM11
+
+TABLE II
+RESULTS ON MULTI-CONTRAST MRI RECONSTRUCTION
+
+NRMSE
+Algorithm
+5.4%
+SparseMRI
+SBL-Seq
+3.4%
+SBL-CoFEM 2.9%
+
+Computation Time
+22.3 min
+89.9 min
+2.5 min (CPU), 0.2 min (GPU)
+
+(cid:96) = M(cid:96)∆horzM(cid:62)
+yhorz
+(cid:96) k(cid:96) for all (cid:96). We impose a multi-task SBL
+model on (zhorz
+, yhorz
+, Φ(cid:96)), as per Eq. (16). We use a shared
+(cid:96)
+αhorz to ensure that we will learn grouped sparsity patterns
+among {zhorz
+(cid:96)=1. The same procedure is repeated for zvert
+based on the operator ∂vert. Further details are in [6].
+
+(cid:96) }L
+
+(cid:96)
+
+(cid:96)
+
+We employ CoFEM for multi-task SBL (Section III-E1) to
+, ˆαvert) for all (cid:96).
+, ˆαhorz) and p(zvert
+recover p(zhorz
+The reconstructed image ˆx(cid:96) are computed from these posterior
+distributions. More details are given in Appendix D-1.
+
+| yhorz
+(cid:96)
+
+| yvert
+(cid:96)
+
+(cid:96)
+
+(cid:96)
+
+2) Data and Hyperparameters: We consider the SRI24
+atlas [42], a set of L = 3 MRI contrasts with dimensions
+200×200 for a total of D = 40,000 pixels. For each image x∗
+(cid:96) ,
+we undersample its 2DFT by a factor of four in the horizontal
+dimension, observing N = 10,000 points to form k(cid:96). The
+mask M(cid:96) is randomly determined according to a power rule
+favoring the center of k-space [43]. For CoFEM, we have
+T = 15, β = 106, K = 8, (cid:15)max = 10−5 and U = 200. The
+algorithm is not sensitive to variations in these values.
+
+3) Results: Fig. 5 provides images of the masks M(cid:96)
+and SBL-CoFEM’s reconstructions ˆx(cid:96). Success is measured
+through NRMSE between the vectorized forms of ˆx ∈ RD·L
+and x∗ ∈ RD·L. Table II compares SBL-CoFEM against
+SparseMRI ((cid:96)1-based compressed sensing [43]) and SBL-Seq
+(SBL with sequential algorithm [6]). Although SBL-Seq has
+lower NRMSE than SparseMRI, it requires high computation
+time. In contrast, SBL-CoFEM attains the lowest error and can
+exploit the GPU to be 450× faster than SBL-Seq.
+
+Finally, the bottom half of Fig. 5 displays error maps of
+absolute differences between ˆx(cid:96) and x∗
+(cid:96) , along with variance
+maps for each image. Each variance map captures the model’s
+conﬁdence over different areas of its reconstruction; pixels
+with high variance indicate more potential to deviate from the
+point estimate ˆx(cid:96). SBL can create variance maps because it
+models uncertainty; non-Bayesian methods that do not model
+uncertainty (e.g. (cid:96)1 methods) cannot generate these maps.
+Appendix D-2 explains how SBL-CoFEM can generate these
+variance maps using the diagonal estimation rule. The variance
+maps bear similarity to the ground-truth error maps, suggesting
+that SBL-CoFEM can predict its errors in reconstruction.
+
+VII. CONCLUSION
+
+We developed covariance-free expectation-maximization
+(CoFEM) to accelerate sparse Bayesian learning (SBL). By
+solving linear systems to circumvent matrix inversion, CoFEM
+exhibits superior time-efﬁciency and space-efﬁciency over ex-
+isting SBL inference schemes, especially when the dictionary
+Φ admits fast matrix-vector multiplication. We theoretically
+analyzed CoFEM’s hyperparameters, such as the number of
+linear systems and number of solver steps, showing that they
+can remain small even at high dimensions. Coupled with GPU
+
+Fig. 5. Undersampling k-space masks and SBL-CoFEM reconstrutions for
+the SRI24 atlas. Error maps are scaled by 15× to aid visualization.
+
+of the image x ∈ RD.5 In practice, one may aim to collect
+N < D points to reduce the amount of time a patient needs to
+remain in the scanner. However, doing so leads to an ill-posed
+inverse problem MFx = k for x, where F ∈ CD×D is the
+2DFT and M ∈ RN ×D is an undersampling operator. Thus,
+compressed sensing strategies often exploit the sparsity of x
+with respect to some transform for accurate reconstruction.
+
+In multi-contrast MRI reconstruction, there are L images
+x1, . . . , xL of an object that one wishes to recover from cor-
+responding undersampled k-space measurements k1, . . . , kL.
+Bilgic et al. [6] showed that SBL with multi-task learning
+(Section III-E1) achieves successful joint recovery of the mul-
+tiple images. They outperformed (cid:96)1-based methods by exploit-
+ing common sparsity patterns among the horizontal/vertical
+image gradients (i.e. row-wise/column-wise ﬁnite differences)
+of x1, x2, . . . , xL. However, the main drawback is the com-
+putation time for reconstruction, which is many times slower
+than (cid:96)1 methods. We demonstrate how CoFEM can accelerate
+this method while maintaining its superior performance.
+1) SBL Model and Inference: For each contrast (cid:96),
+let
+Φ(cid:96) = M(cid:96)F denote the (cid:96)-th undersampled 2DFT operator
+with undersampling mask M(cid:96). The task is to infer the sparse
+= ∂horzx(cid:96) ∈ RD, where ∂horz denotes
+latent vector zhorz
+the horizontal
+is
+a convolution,
+it corresponds to a diagonal
+matrix ∆horz in the Fourier domain. Let the observed data be
+
+(cid:96)
+image gradient operator. Note that ∂horz
+implying that
+
+5Though MRIs are generally complex-valued, the data we use here are
+
+real-valued. See [6] for how to generalize SBL to the complex case.
+
+2DFTMask1(M1)2DFTMask2(M2)2DFTMask3(M3)Reconstruction1(ˆx1)Reconstruction2(ˆx2)Reconstruction3(ˆx3)ErrorMap(Recon1)ErrorMap(Recon2)ErrorMap(Recon3)VarianceMap(Recon1)VarianceMap(Recon2)VarianceMap(Recon3)acceleration, CoFEM can be up to thousands of times faster
+than other SBL methods without sacriﬁcing sparse coding
+accuracy. Finally, we used CoFEM for real-data applications,
+showing that it can adapt to multi-task learning and non-
+negativity constraints, while enabling SBL to be competitive
+with non-Bayesian methods in accuracy and scalability.
+
+APPENDIX A
+PROOF OF THEOREM 1
+Proof. We begin by characterizing ˆΣ := limt→∞ Σ(t). By the
+block matrix inversion formula [44], any symmetric positive
+deﬁnite matrix with diagonal blocks X, Z and off-diagonal
+block Y and can be inverted as
+(cid:20) X Y
+Y(cid:62) Z
+
+(cid:20)X−1 + X−1YWY(cid:62)X−1 −X−1YW
+
+−WY(cid:62)X−1
+
+(cid:21)
+, (34)
+
+(cid:21)−1
+=
+
+W
+
+where W := (Z − Y(cid:62)X−1Y)−1 is the inverse Schur
+complement. We apply Eq. (34) to Σ(t), with X := βΦ(cid:62)
+S ΦS +
+diag{α(t)
+U }.
+As t → ∞, we have α(t)
+j → ∞ for j ∈ U, which forces
+W → 0, where 0 is the zero-matrix. Then, by Eq. (34),
+
+S ΦU , and Z := βΦ(cid:62)
+
+U ΦU + diag{α(t)
+
+S }, Y := βΦ(cid:62)
+
+ˆΣ = lim
+t→∞
+
+Σ(t) =
+
+(cid:20)(βΦ(cid:62)
+
+(cid:21)
+S ΦS + diag{ ˆαS })−1 0
+0
+
+0
+
+.
+
+(35)
+
+Eq. (24) follows from applying Eq. (35) to Lemma 1 for
+j ∈ U; since all rows of ˆΣ that correspond to U are zero, the
+estimator’s standard deviation must also converge to zero.
+
+We now prove Eq. (25) for an active index j ∈ S. Let
+ψj > 0 be any positive real number. Using Lemma 1 and Eq.
+(35), we can bound ˆνj := limt→∞ ν(t)
+
+j with
+
+(cid:118)
+(cid:117)
+(cid:117)
+(cid:116)
+
+1
+K
+
+ˆνj =
+
+(cid:88)
+
+ˆΣ2
+
+j,j(cid:48) ≤
+
+j(cid:48)∈Tj
+
+1
+√
+K
+
+(cid:115)
+
+( ˆΣj,j − ψj)2 +
+
+(cid:88)
+
+ˆΣ2
+
+j,j(cid:48), (36)
+
+j(cid:48)∈Tj
+
+(cid:107)( ˆΣS,S − Ψ)ej(cid:107)2
+
+where Tj := S \ {j}. Let Ψ ∈ R|S|×|S| be a diagonal matrix
+with ψj for all j ∈ S along its diagonal. Let ej be the standard
+unit vector in R|S| corresponding to j. From Eq. (36), we have
+ˆνj ≤ 1√
+K
+≤ 1√
+K
+≤ 1√
+K
+= 1√
+K
+
+S,S − Ψ−1)(cid:107)2(cid:107) ˆΣS,S (cid:107)2
+S ΦS + diag{ ˆαS } − Ψ−1)(cid:107)2(cid:107) ˆΣS,S (cid:107)2, (37)
+
+(cid:107) ˆΣS,S − Ψ(cid:107)2 = 1√
+K
+
+(cid:107)Ψ( ˆΣ
+(cid:107)Ψ(βΦ(cid:62)
+
+S,S − Ψ−1) ˆΣS,S (cid:107)2
+
+(cid:107)Ψ( ˆΣ
+
+−1
+
+−1
+
+−1
+S,S .
+
+where the last step uses Eq. (35) to expand ˆΣ
+
+We now perform a change-of-variables: Let Θ ∈ R|S|×|S|
+be any diagonal matrix of positive diagonal values. We deﬁne
+Ψ := (βΘ + diag{ ˆαS })−1 and re-write Eq. (37) as
+ˆνj ≤ 1√
+K
+≤ 1√
+K
+= 1√
+K
+
+(cid:107)(βΘ + diag{ ˆαS })−1(βΦ(cid:62)
+(cid:107)(βΘ)−1(βΦ(cid:62)
+(cid:107)Θ−1Φ(cid:62)
+
+S ΦS − I(cid:107)2(cid:107) ˆΣS,S (cid:107)2.
+Finally, we can bound the last term of Eq. (38) with
+
+S ΦS − βΘ)(cid:107)2(cid:107) ˆΣS,S (cid:107)2
+
+S ΦS − βΘ)(cid:107)2(cid:107) ˆΣS,S (cid:107)2
+
+(38)
+
+(cid:107) ˆΣS,S (cid:107)2 =
+
+1
+λmin( ˆΣ
+
+−1
+S,S )
+
+≤
+
+1
+
+β · λmin(Φ(cid:62)
+
+S ΦS )
+
+,
+
+(39)
+
+where we use the fact that the singular values coincide with
+the eigenvalues for a symmetric positive deﬁnite matrix.
+
+12
+
+APPENDIX B
+PROOF OF THEOREM 2
+Proof. The statement follows from Eq. (27) and showing
+that ˆκ := limt→∞ κ(A(cid:48)(t)) ≤ (1 + ξ)/(1 − ξ), where
+S ΦS − I(cid:107). Let ∆ := βΦ(cid:62)Φ − diag{βθ}. Then,
+ξ := (cid:107)Θ−1Φ(cid:62)
+A(t) = M(t) + ∆ =⇒ A(cid:48)(t)
+= I + (M(t))− 1
+2 ∆(M(t))− 1
+(cid:34)
+(cid:35)
+− 1
+− 1
+S,S ∆S,S ˆM
+S,S 0
+2
+2
+0
+0
+
+=⇒ ˆA(cid:48) := lim
+t→∞
+
+A(cid:48)(t)
+
+, (40)
+
+= I +
+
+ˆM
+
+2
+
+where ˆM := diag{βθ + ˆα}.
+
+S,S ∆S,S ˆM−1/2
+
+Our goal is to bound ˆκ = λmax( ˆA(cid:48))/λmin( ˆA(cid:48)). Eq. (40)
+shows that if η is an eigenvalue of ˆM−1/2
+S,S , then
+1+η is an eigenvalue of ˆA(cid:48). This reduces our task to bounding
+η. A matrix X ∈ RD×D is similar to another matrix Y ∈
+RD×D if there exists an invertible matrix Z ∈ RD×D such
+that Y = Z−1XZ, and this further implies that X and Y have
+S,S ∆S,S ˆM−1/2
+the same eigenvalues [44]. Since X := ˆM−1/2
+S,S
+is similar to Y := ˆM−1
+S,S , it follows that
+η is also an eigenvalue of Y. The absolute eigenvalues of a
+matrix cannot exceed its spectral norm, implying
+
+S,S ∆S,S for Z := ˆM1/2
+
+S,S ∆S,S (cid:107)2 = (cid:107) ˆM−1
+
+S,S (βΦ(cid:62)
+
+S ΦS − βΘ)(cid:107)2
+
+|η| ≤ (cid:107) ˆM−1
+≤ (cid:107)(βΘ)−1(βΦ(cid:62)
+
+S ΦS − βΘ)(cid:107)2 = (cid:107)Θ−1Φ(cid:62)
+It follows that λmax( ˆA(cid:48)) ≤ 1 + (cid:107)Θ−1Φ(cid:62)
+λmin( ˆA(cid:48)) ≥ 1 − (cid:107)Θ−1Φ(cid:62)
+
+S ΦS − I(cid:107)2, which bounds κ( ˆA(cid:48)).
+
+S ΦS − I(cid:107)2. (41)
+
+S ΦS − I(cid:107)2 and
+
+APPENDIX C
+DETAILS OF SBL FOR CALCIUM DECONVOLUTION
+1) Filtered Mode: Let S ⊆ {1, 2, . . . , D} be the set of
+selected indices after percentile ﬁltering of p(z | y, ˆα) recov-
+ered by CoFEM. Let ΦS ∈ RN ×|S| denote the sub-matrix of
+Φ composed of the columns corresponding to S. Then, the
+ﬁltered mode is the solution to the following problem:
+
+ˆu = arg min
+
+u≥0∈R|S|
+
+||y − ΦS u||2
+
+2 +
+
+(ˆαj/β)u2
+j ,
+
+(42)
+
+(cid:88)
+
+j∈S
+
+which can be obtained using non-negative least-squares
+solvers. Solving Eq. (42) is fast in practice, because it is a
+low-dimensional problem (i.e. |S| (cid:28) D). Our point estimate
+solution is ˆz, where ˆzj = uj for j ∈ S and ˆzj = 0 for j (cid:54)∈ S.
+
+APPENDIX D
+DETAILS OF SBL FOR MRI RECONSTRUCTION
+
+(cid:96)
+
+and µvert
+
+1) Final Reconstruction: Let µhorz
+
+denote the re-
+, ˆαvert).
+|yvert
+spective means of p(zhorz
+(cid:96)
+These quantities are combined through solving a constrained
+least-squares problem to yield a ﬁnal reconstruction ˆx(cid:96):
+(cid:96) (cid:107)2
+2,
+
+2 + (cid:107)∂vertx(cid:96) − µvert
+
+, ˆαhorz) and p(zvert
+
+(cid:107)∂horzx(cid:96) − µhorz
+
+(cid:96) (cid:107)2
+
+|yhorz
+(cid:96)
+
+(cid:96)
+
+(cid:96)
+
+(cid:96)
+
+ˆx(cid:96) = arg min
+x(cid:96)
+s.t. M(cid:96)Fx(cid:96) = k(cid:96).
+
+(43)
+
+We use Parseval’s Theorem [31] to cast Eq. (43) to the Fourier
+domain. This converts ∂horz and ∂vert into diagonal matrices
+∆horz and ∆vert in the Fourier domain, giving an element-wise
+separable problem with a closed-form solution [6].
+
+(cid:96)
+
+(cid:96)
+
+, Σvert
+(cid:96)
+
+, Σhorz
+(cid:96)
+
+) and N (µvert
+
+2) Variance Map: For each MRI contrast (cid:96), SBL learns
+posterior distributions N (µhorz
+) for
+the image gradients. We use the fact that for z ∼ N (µ, Σ)
+and a matrix E, we have Ez ∼ N (Eµ, EΣE(cid:62)). The solution
+to Eq. (43) has the form ˆx(cid:96) = E1µhorz
+(cid:96) + e for some
+matrices E1, E2 ∈ RD×D and some vector e ∈ RD. To obtain
+variance maps for ˆx(cid:96), we ﬁnd the diagonal elements of its
+covariance matrix Ψ := E1Σhorz
+2 . We can do
+this by drawing probes and applying the diagonal estimation
+rule (Section III-A). In doing so, we need to apply Σhorz
+(cid:96) =
+(Φ(cid:62)Φ + ˆαhorz)−1 and Σvert
+(cid:96) = (Φ(cid:62)Φ + ˆαvert)−1 to arbitrary
+vectors, which can be done via parallel CG (Section III-B).
+
+(cid:96) + E2µhorz
+
+1 + E2Σvert
+
+(cid:96) E(cid:62)
+
+(cid:96) E(cid:62)
+
+REFERENCES
+
+[1] D. J. MacKay, “Bayesian methods for backpropagation networks,” in
+
+Models of neural networks III. Springer, 1996.
+
+[2] M. E. Tipping, “Sparse bayesian learning and the relevance vector
+machine,” Journal of machine learning research, vol. 1, no. Jun, pp.
+211–244, 2001.
+
+[3] S. Ji, Y. Xue, and L. Carin, “Bayesian compressive sensing,” IEEE
+Transactions on signal processing, vol. 56, no. 6, pp. 2346–2356, 2008.
+[4] S. Ji, D. Dunson, and L. Carin, “Multitask compressive sensing,” IEEE
+Transactions on Signal Processing, vol. 57, no. 1, pp. 92–106, 2008.
+[5] D. P. Wipf and B. D. Rao, “Sparse bayesian learning for basis selection,”
+IEEE Transactions on Signal processing, vol. 52, no. 8, pp. 2153–2164,
+2004.
+
+[6] B. Bilgic, V. K. Goyal, and E. Adalsteinsson, “Multi-contrast recon-
+struction with bayesian compressed sensing,” Magnetic resonance in
+medicine, vol. 66, no. 6, pp. 1601–1615, 2011.
+
+[7] S. Liu, J. Jia, Y. D. Zhang, and Y. Yang, “Image reconstruction
+in electrical impedance tomography based on structure-aware sparse
+bayesian learning,” IEEE transactions on medical imaging, vol. 37,
+no. 9, pp. 2090–2102, 2018.
+
+[8] P. Chen, Z. Cao, Z. Chen, and X. Wang, “Off-grid doa estimation using
+sparse bayesian learning in mimo radar with unknown mutual coupling,”
+IEEE Transactions on Signal Processing, vol. 67, no. 1, pp. 208–220,
+2018.
+
+[9] Y. Ma, Y. Konishi, K. Kinoshita, S. Lao, and M. Kawade, “Sparse
+bayesian regression for head pose estimation,” in 18th International
+Conference on Pattern Recognition (ICPR’06), vol. 3.
+IEEE, 2006,
+pp. 507–510.
+
+[10] Z. Zhang, T.-P. Jung, S. Makeig, and B. D. Rao, “Compressed sensing
+for energy-efﬁcient wireless telemonitoring of noninvasive fetal ecg
+via block sparse bayesian learning,” IEEE Transactions on Biomedical
+Engineering, vol. 60, no. 2, pp. 300–309, 2012.
+
+[11] S. Yuan, S. Wang, M. Ma, Y. Ji, and L. Deng, “Sparse bayesian learning-
+based time-variant deconvolution,” IEEE Transactions on Geoscience
+and Remote Sensing, vol. 55, no. 11, pp. 6182–6194, 2017.
+
+[12] O. Williams, A. Blake, and R. Cipolla, “Sparse bayesian learning for
+efﬁcient visual tracking,” IEEE Transactions on Pattern Analysis and
+Machine Intelligence, vol. 27, no. 8, pp. 1292–1304, 2005.
+
+[13] Q. Wu, Y. D. Zhang, M. G. Amin, and B. Himed, “Space–time adaptive
+processing and motion parameter estimation in multistatic passive radar
+using sparse bayesian learning,” IEEE Transactions on Geoscience and
+Remote Sensing, vol. 54, no. 2, pp. 944–957, 2015.
+
+[14] J. Fang, Y. Shen, H. Li, and P. Wang, “Pattern-coupled sparse bayesian
+learning for recovery of block-sparse signals,” IEEE Transactions on
+Signal Processing, vol. 63, no. 2, pp. 360–372, 2014.
+
+[15] D. P. Wipf, S. S. Nagarajan, J. Platt, D. Koller, and Y. Singer, “A new
+view of automatic relevance determination.” in NIPS, 2007, pp. 1625–
+1632.
+
+[16] D. Wipf and S. Nagarajan, “Iterative reweighted (cid:96)1and (cid:96)2 methods for
+ﬁnding sparse solutions,” IEEE Journal of Selected Topics in Signal
+Processing, vol. 4, no. 2, pp. 317–329, 2010.
+
+[17] J. Fang, L. Zhang, and H. Li, “Two-dimensional pattern-coupled sparse
+Bayesian learning via generalized approximate message passing,” IEEE
+Transactions on Image Processing, vol. 25, no. 6, pp. 2920–2930, 2016.
+[18] H. Duan, L. Yang, J. Fang, and H. Li, “Fast inverse-free sparse bayesian
+learning via relaxed evidence lower bound maximization,” IEEE Signal
+Processing Letters, vol. 24, no. 6, pp. 774–778, 2017.
+
+[19] M. E. Tipping, A. C. Faul et al., “Fast marginal likelihood maximisation
+
+for sparse bayesian models.” in AISTATS, 2003.
+
+13
+
+[20] D. P. Wipf, B. D. Rao, and S. Nagarajan, “Latent variable bayesian
+models for promoting sparsity,” IEEE Transactions on Information
+Theory, vol. 57, no. 9, pp. 6236–6255, 2011.
+
+[21] A. P. Dempster, N. M. Laird, and D. B. Rubin, “Maximum likelihood
+from incomplete data via the em algorithm,” Journal of the Royal
+Statistical Society: Series B (Methodological), vol. 39, no. 1, pp. 1–22,
+1977.
+
+[22] M. Al-Shoukairi and B. Rao, “Sparse bayesian learning using approxi-
+mate message passing,” in 2014 48th Asilomar Conference on Signals,
+Systems and Computers.
+
+IEEE, 2014, pp. 1957–1961.
+
+[23] M. Al-Shoukairi, P. Schniter, and B. D. Rao, “A gamp-based low
+complexity sparse bayesian learning algorithm,” IEEE Transactions on
+Signal Processing, vol. 66, no. 2, pp. 294–308, 2017.
+
+[24] C. M. Bishop and M. Tipping, “Variational relevance vector machines,”
+
+Uncertainty in Artiﬁcial Intelligence, 2000.
+
+[25] S. D. Babacan, M. Luessi, R. Molina, and A. K. Katsaggelos, “Low-
+rank matrix completion by variational sparse bayesian learning,” in
+2011 IEEE International Conference on Acoustics, Speech and Signal
+Processing (ICASSP).
+
+IEEE, 2011, pp. 2188–2191.
+
+[26] D. Shutin, T. Buchgraber, S. R. Kulkarni, and H. V. Poor, “Fast varia-
+tional sparse bayesian learning with automatic relevance determination
+for superimposed signals,” IEEE Transactions on Signal Processing,
+vol. 59, no. 12, pp. 6257–6261, 2011.
+
+[27] B. Worley, “Scalable mean-ﬁeld sparse bayesian learning,” IEEE Trans-
+
+actions on Signal Processing, vol. 67, no. 24, pp. 6314–6326, 2019.
+
+[28] C. Bekas, E. Kokiopoulou, and Y. Saad, “An estimator for the diagonal
+of a matrix,” Applied numerical mathematics, vol. 57, no. 11-12, pp.
+1214–1229, 2007.
+
+[29] M. R. Hestenes, E. Stiefel et al., Methods of conjugate gradients for
+
+solving linear systems. NBS Washington, DC, 1952, vol. 49, no. 1.
+
+[30] J. R. Shewchuk et al., “An introduction to the conjugate gradient method
+
+without the agonizing pain,” 1994.
+
+[31] A. V. Oppenheim, J. R. Buck, and R. W. Schafer, Discrete-time signal
+processing. Vol. 2. Upper Saddle River, NJ: Prentice Hall, 2001.
+[32] D. P. Wipf and B. D. Rao, “An empirical bayesian strategy for solving
+the simultaneous sparse approximation problem,” IEEE Transactions on
+Signal Processing, vol. 55, no. 7, pp. 3704–3716, 2007.
+
+[33] Q. Wu, Y. D. Zhang, M. G. Amin, and B. Himed, “Complex multitask
+bayesian compressive sensing,” in 2014 IEEE International Conference
+on Acoustics, Speech and Signal Processing (ICASSP).
+IEEE, 2014,
+pp. 3375–3379.
+
+[34] A. Nalci, I. Fedorov, M. Al-Shoukairi, T. T. Liu, and B. D. Rao,
+“Rectiﬁed gaussian scale mixtures and the sparse non-negative least
+squares problem,” IEEE Transactions on Signal Processing, vol. 66,
+no. 12, pp. 3124–3139, 2018.
+
+[35] S. Foucart and H. Rauhut, A Mathematical Introduction to Compressive
+
+Sensing., 2013.
+
+[36] C. Grienberger and A. Konnerth, “Imaging calcium in neurons,” Neuron,
+
+vol. 73, no. 5, pp. 862–885, 2012.
+
+[37] J. Friedrich, P. Zhou, and L. Paninski, “Fast online deconvolution of
+calcium imaging data,” PLoS computational biology, vol. 13, no. 3, p.
+e1005423, 2017.
+
+[38] J. Akerboom, T.-W. Chen, T. J. Wardill, L. Tian, J. S. Marvin, S. Mutlu,
+N. C. Calder´on, F. Esposti, B. G. Borghuis, X. R. Sun et al., “Optimiza-
+tion of a gcamp calcium indicator for neural activity imaging,” Journal
+of neuroscience, vol. 32, no. 40, pp. 13 819–13 840, 2012.
+
+[39] E. A. Pnevmatikakis, D. Soudry, Y. Gao, T. A. Machado, J. Merel,
+D. Pfau, T. Reardon, Y. Mu, C. Laceﬁeld, W. Yang et al., “Simultaneous
+denoising, deconvolution, and demixing of calcium imaging data,”
+Neuron, vol. 89, no. 2, pp. 285–299, 2016.
+
+[40] J. T. Vogelstein, A. M. Packer, T. A. Machado, T. Sippy, B. Babadi,
+R. Yuste, and L. Paninski, “Fast nonnegative deconvolution for spike
+train inference from population calcium imaging,” Journal of neuro-
+physiology, vol. 104, no. 6, pp. 3691–3704, 2010.
+
+[41] D. G. Nishimura, Principles of magnetic resonance imaging. Standford
+
+Univ., 2010.
+
+[42] T. Rohlﬁng, N. M. Zahr, E. V. Sullivan, and A. Pfefferbaum, “The sri24
+multichannel atlas of normal adult human brain structure,” Human brain
+mapping, vol. 31, no. 5, pp. 798–819, 2010.
+
+[43] M. Lustig, D. Donoho, and J. M. Pauly, “Sparse MRI: The application
+of compressed sensing for rapid mr imaging,” Magnetic Resonance in
+Medicine: An Ofﬁcial Journal of the International Society for Magnetic
+Resonance in Medicine, vol. 58, no. 6, pp. 1182–1195, 2007.
+
+[44] G. Strang, Linear algebra and its applications. Belmont, CA: Thomson,
+
+Brooks/Cole, 2006.
+
+

@@ -104,8 +104,8 @@ if __name__ == "__main__":
     # Save figure
     plt.savefig(os.path.join(figure_dir, "accuracy_vs_sparsity_EMCoFEM.png"), dpi=DPI, bbox_inches="tight")
     plt.close()
-
-    delta_vals, em_known_err, em_learned_err, cofem_known_err, cofem_learned_err = run_accuracy_vs_undersampling(delta_values=np.linspace(1, 0.28, 20),repetitions=5)
+    
+    delta_vals, em_known_err, em_learned_err, cofem_known_err, cofem_learned_err = run_accuracy_vs_undersampling(delta_values=np.linspace(0.1, 1, 20),repetitions=1)
 
     # Prepare figure path
     base_dir = os.path.dirname(os.path.dirname(__file__))
@@ -122,6 +122,7 @@ if __name__ == "__main__":
     plt.xlabel(r"Undersampling factor $\delta$")
     plt.ylabel(r"NRMSE [%]")
     plt.title("Accuracy vs. Undersampling (Gaussian Dictionary)")
+    plt.gca().invert_xaxis()
     plt.grid(True)
     plt.legend()
     plt.tight_layout()

@@ -31,8 +31,9 @@ if __name__ == "__main__":
     
     # Calculate MSE against true weights w_true
     for weights_cofem, weights_em in zip(tracked_weights_cofem, tracked_weights_em):
-        mse_cofem.append(np.linalg.norm(w_true - weights_cofem))
-        mse_em.append(np.linalg.norm(w_true - weights_em))
+        # Use absolute value for complex numbers
+        mse_cofem.append(np.linalg.norm(np.abs(w_true - weights_cofem)))
+        mse_em.append(np.linalg.norm(np.abs(w_true - weights_em)))
     
     # Plot results
     plt.figure(figsize=(12, 6))

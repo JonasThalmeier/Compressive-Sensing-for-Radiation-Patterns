@@ -21,6 +21,7 @@ class SBL_EM:
         self.max_iter = max_iter
         self.threshold = threshold
         self.beta_in = beta_in
+        self.real = np.allclose(Phi, Phi.real) and np.allclose(t, t.real)
         
         # Initialize hyperparameters
         self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
@@ -32,10 +33,9 @@ class SBL_EM:
         
     def estimate_posterior(self):
         """E-step: Estimate posterior distribution of w"""
-        # Compute posterior covariance using alpha and sigma_squared
-        Sigma = np.linalg.inv(self.beta * self.Phi.T @ self.Phi + np.diag(self.alpha))
-        # Compute posterior mean
-        mu = self.beta * Sigma @ self.Phi.T @ self.t
+        # Use complex conjugate transpose
+        Sigma = np.linalg.inv(self.beta * self.Phi.conj().T @ self.Phi + np.diag(self.alpha))
+        mu = self.beta * Sigma @ self.Phi.conj().T @ self.t
         return mu, Sigma
     
     def maximize(self, mu, Sigma):
@@ -51,9 +51,12 @@ class SBL_EM:
             sum = np.sum(1 - self.alpha * np.diag(Sigma))
             #self.beta = (self.N - sum) / (np.sum(np.square(error)))
             self.beta = self.N/(np.sum(np.square(error))+sum/self.beta)
+        
+        # Use absolute value for complex error
+        error = self.t - self.Phi @ mu
 
 
-    def fit(self, track_iterations=np.arange(1, 1001, 100)):
+    def fit(self, track_iterations=np.arange(1, 1001, 5)):
         """Run EM algorithm and track weight evolution
         
         Parameters:
@@ -63,8 +66,12 @@ class SBL_EM:
             mu: final weight estimates
             tracked_weights: dictionary with weights at specified iterations
         """
-        old_mu = np.ones(self.D)
-        tracked_weights = np.zeros((len(track_iterations), self.D))
+        if self.real:
+            old_mu = np.ones(self.D)
+            tracked_weights = np.zeros((len(track_iterations), self.D))
+        else:
+            old_mu = np.ones(self.D, dtype=complex)
+            tracked_weights = np.zeros((len(track_iterations), self.D), dtype=complex)
         
         for iter in range(self.max_iter):
             # E-step

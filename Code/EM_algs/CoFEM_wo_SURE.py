@@ -25,6 +25,7 @@ class SBL_CoFEM:
         self.threshold = threshold
         self.num_probes = num_probes
         self.beta_in = beta_in
+        self.real = np.allclose(Phi, Phi.real) and np.allclose(t, t.real)
 
         # Initialize hyperparameters
         self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
@@ -35,7 +36,13 @@ class SBL_CoFEM:
         
     def _samp_probes(self, size: Tuple[int, ...]) -> np.ndarray:
         """Sample Rademacher probes {±1}."""
-        return 2 * (np.random.rand(*size) > 0.5) - 1
+        if self.real:
+            # For real-valued data, use Rademacher probes
+            return 2 * (np.random.rand(*size) > 0.5) - 1
+        else:
+            real_part = 2 * (np.random.rand(*size) > 0.5) - 1
+            imag_part = 2 * (np.random.rand(*size) > 0.5) - 1
+            return real_part + 1j * imag_part
     
     def _conj_grad(self, A, B, max_iters=1000, tol=1e-3):
         """Parallel Conjugate Gradient solver following Algorithm 2."""
@@ -75,18 +82,17 @@ class SBL_CoFEM:
 
     def estimate_posterior(self):
         """Simplified E-step following Algorithm 1."""
-        # Define matrix A = βΦ^T Φ + diag{α}
         def A(x):
-            # x has shape (D, K+1)
-            Phi_T_Phi_x = self.Phi.T @ (self.Phi @ x)  # Shape: (D, K+1)
-            return self.beta * Phi_T_Phi_x + np.diag(self.alpha) @ x  # Use diagonal matrix multiplication
-        
+            # Handle complex conjugate transpose for Fourier matrix
+            Phi_T_Phi_x = self.Phi.conj().T @ (self.Phi @ x)
+            return self.beta * Phi_T_Phi_x + np.diag(self.alpha) @ x
+
         # Sample Rademacher probes (K x D)
         K = self.num_probes
         probes = self._samp_probes((self.D,K))  # Shape: (D,K)
         
         # Define matrix B = [p1|p2|...|pK|βΦ^T y]
-        beta_phi_T_y = (self.beta * self.Phi.T @ self.t).reshape((self.D, 1))  # Shape: (D, 1)
+        beta_phi_T_y = (self.beta * self.Phi.conj().T @ self.t).reshape((self.D, 1))  # Shape: (D, 1)
         B = np.hstack([probes, beta_phi_T_y])  # Shape: (D, K+1)
 
         # Solve linear system
@@ -109,7 +115,7 @@ class SBL_CoFEM:
         # Compute variances sj = 1/K Σ(pk,j * xk,j)
         # s = np.mean(probes * x, axis=0)
         # s = (1 / self.beta) * np.clip(np.mean(probes * x, axis=1), 0, None)
-        s = np.clip(np.mean(probes * x, axis=1), 0, None)        
+        s = np.clip(np.mean(np.conj(probes) * x, axis=1), 0, None)        
         return mu, s
     
     def maximize(self, mu: np.ndarray, s: np.ndarray):
@@ -123,11 +129,15 @@ class SBL_CoFEM:
             sum = np.sum(1 - self.alpha * s)
             self.beta = self.N/(np.sum(np.square(error))+sum/self.beta)
         
-    def fit(self, track_iterations=np.arange(1, 1001, 100)):
+    def fit(self, track_iterations=np.arange(1, 1001, 5)):
         """Run CoFEM algorithm and track weight evolution."""
-        old_mu = np.ones(self.D)
-        tracked_weights = np.zeros((len(track_iterations), self.D))
-        
+        # Initialize with complex dtype
+        if self.real:
+            old_mu = np.ones(self.D)
+            tracked_weights = np.zeros((len(track_iterations), self.D))
+        else:
+            old_mu = np.ones(self.D, dtype=complex)
+            tracked_weights = np.zeros((len(track_iterations), self.D), dtype=complex)
         for iter in range(self.max_iter):
             # E-step
             mu, s = self.estimate_posterior()
@@ -135,7 +145,7 @@ class SBL_CoFEM:
             # Save weights if current iteration is in track_iterations
             if iter + 1 in track_iterations:
                 idx = np.where(track_iterations == iter + 1)[0][0]
-                tracked_weights[idx] = mu.copy()
+                tracked_weights[idx] = mu.copy()  # Will preserve complex values
             
             # M-step
             self.maximize(mu, s)

@@ -190,7 +190,7 @@ As shown in Figure~\ref{fig:runtime_comparison}, the CoFEM implementation signif
 While the CoFEM algorithm achieves a noticeable speedup over the standard EM algorithm—98.4 seconds compared to 146.6 seconds for N=500—the improvement falls short of the expected at least twofold acceleration.
 
 \subsection{Performance Comparison of EM Algorithms}
-\paragraph{Gaussian Matrix}
+
 To compare the performance of different EM-based Sparse Bayesian Learning algorithms, experiments were conducted using synthetic data generated from Gaussian dictionaries, varying both the sparsity level $ \rho $ and the undersampling factor $ \delta = N/D $. Four variants were considered: standard EM and CoFEM, each with known and unknown noise variance. The normalized root mean squared error (NRMSE) was used to evaluate reconstruction quality. Results are averaged over multiple random trials to ensure statistical robustness.
 
 The signal dimension was fixed to $ D = 1024 $. For the sparsity analysis the undersampling factor was fixed at $ \delta = 0.25 $, corresponding to $ N = \lfloor \delta D \rfloor $ measurements. For the undersampling analysis, the sparsity level was fixed at $ \rho = 0.06 $. The measurement matrix was drawn from a standard Gaussian distribution. Additive Gaussian noise with standard deviation $ \sigma = 0.01 $ was added to the measurements. For each setting, the reported results represent the average over five random trials to account for variability due to random initialization and noise.
@@ -214,46 +214,20 @@ As shown in Figure \ref{fig:accuracy_vs_sparsity} and Figure \ref{fig:accuracy_v
 
 Given these results, and in order to simplify subsequent analysis, I choose to focus on the CoFEM algorithm with unknown noise variance in the remainder of this report. This choice is motivated by its computational scalability, the practical advantage of not requiring prior knowledge of the noise level, and the observation that its reconstruction performance closely matches that of other EM-based approaches in the tested settings. While this similarity may not generalize to all scenarios, it provides a reasonable basis for concentrating on a single representative method in this context.
 
-\paragraph{Fourier Matrix}
-As soon as the measurement matrix $\Phi$ gets changed from Gaussian to a matrix representing a Fourier Transform, thinks change rapidly. The diagonal Estimation of the CoFEM algorithm had to be modified so that both  
+
 \begin{figure}[h]
     \centering
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Figures/accuracy_vs_undersampling_FFTGauss_EM.png}
-        \caption{First subfigure}
-        \label{fig:sub1}
-    \end{subfigure}
-    \hfill % Adds horizontal space
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Figures/accuracy_vs_sparsity_FFTGauss_EM.png}
-        \caption{Second subfigure}
-        \label{fig:sub2}
-    \end{subfigure}
-    
-    \vspace{0.5cm} % Adds vertical space between rows
-    
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Figures/accuracy_vs_undersampling_FFTGauss_CoFEM.png}
-        \caption{Third subfigure}
-        \label{fig:sub3}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Figures/accuracy_vs_sparsity_FFTGauss_CoFEM.png}
-        \caption{Fourth subfigure}
-        \label{fig:sub4}
-    \end{subfigure}
-    
-    \caption{Four figures arranged in a 2×2 grid.}
-    \label{fig:grid}
+    \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_undersampling_EMCoFEM.png}
+    \caption{Reconstruction accuracy (NRMSE) versus undersampling factor $ \delta $. Similar performance is observed across all algorithms.}
+    \label{fig:accuracy_vs_undersampling}
 \end{figure}
-
-\section{Sparse Bayesian Learning with Steins Unbiased Risk Estimate}
-\subsection{Steins Lemma}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_undersampling_EMCoFEM.png}
+    \caption{Reconstruction accuracy (NRMSE) versus undersampling factor $ \delta $. Similar performance is observed across all algorithms.}
+    \label{fig:accuracy_vs_undersampling}
+\end{figure}
+Future parts of this subsection will further evaluate CoFEM performance under different dictionary types (e.g., Gaussian vs. subsampled Fourier) and analyze the impact of hyperparameters and probe strategies.
 
 \bibliographystyle{ieeetr}   % Or another style: plain, abbrv, unsrt, etc.
 \bibliography{Compressive_Sensing_Report}    
