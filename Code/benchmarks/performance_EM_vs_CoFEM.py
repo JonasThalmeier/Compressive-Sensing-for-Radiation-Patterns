@@ -18,7 +18,7 @@ def run_accuracy_vs_sparsity(D=1024, rho_values=np.linspace(0.01, 0.5, 10), delt
     for i in range(repetitions):
         for r, rho in enumerate(rho_values):
             N = int(np.floor(D*delta))
-            t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=False)
+            t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=False, seed=42 + i)
 
             # EM (known noise)
             sbl_em = SBL_EM(t, Phi, max_iter=max_iter, threshold=threshold, beta_in=1/sigma**2)
@@ -53,7 +53,7 @@ def run_accuracy_vs_undersampling(D=1024, delta_values=np.linspace(1, 0.1, 10), 
     for i in range(repetitions):
         for d, delta in enumerate(delta_values):
             N = int(np.floor(D*delta))
-            t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=False)
+            t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=False, seed=42 + i)
 
             # EM (known noise)
             sbl_em = SBL_EM(t, Phi, max_iter=max_iter, threshold=threshold, beta_in=1/sigma**2)
@@ -80,7 +80,7 @@ def run_accuracy_vs_undersampling(D=1024, delta_values=np.linspace(1, 0.1, 10), 
     return delta_values, em_known_errors, em_learned_errors, cofem_known_errors, cofem_learned_errors
 
 if __name__ == "__main__":
-    rho_vals, em_known_err, em_learned_err, cofem_known_err, cofem_learned_err = run_accuracy_vs_sparsity(rho_values=np.linspace(0.01, 0.28, 20),repetitions=5)
+    rho_vals, em_known_err, em_learned_err, cofem_known_err, cofem_learned_err = run_accuracy_vs_sparsity(rho_values=np.linspace(0.01, 0.28, 5),repetitions=1)
 
     # Prepare figure path
     base_dir = os.path.dirname(os.path.dirname(__file__))
@@ -102,10 +102,10 @@ if __name__ == "__main__":
     plt.tight_layout()
 
     # Save figure
-    plt.savefig(os.path.join(figure_dir, "accuracy_vs_sparsity_EMCoFEM.png"), dpi=DPI, bbox_inches="tight")
+    plt.savefig(os.path.join(figure_dir, "accuracy_vs_sparsity_EMCoFEM_test.png"), dpi=DPI, bbox_inches="tight")
     plt.close()
     
-    delta_vals, em_known_err, em_learned_err, cofem_known_err, cofem_learned_err = run_accuracy_vs_undersampling(delta_values=np.linspace(0.1, 1, 20),repetitions=1)
+    delta_vals, em_known_err, em_learned_err, cofem_known_err, cofem_learned_err = run_accuracy_vs_undersampling(delta_values=np.linspace(0.1, 1, 20),repetitions=5)
 
     # Prepare figure path
     base_dir = os.path.dirname(os.path.dirname(__file__))
@@ -128,5 +128,5 @@ if __name__ == "__main__":
     plt.tight_layout()
 
     # Save figure
-    plt.savefig(os.path.join(figure_dir, "accuracy_vs_undersampling_EMCoFEM.png"), dpi=DPI, bbox_inches="tight")
+    plt.savefig(os.path.join(figure_dir, "accuracy_vs_undersampling_EMCoFEM_test.png"), dpi=DPI, bbox_inches="tight")
     plt.close()

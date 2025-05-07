@@ -197,14 +197,14 @@ The signal dimension was fixed to $ D = 1024 $. For the sparsity analysis the un
 
 As shown in Figure \ref{fig:accuracy_vs_sparsity} and Figure \ref{fig:accuracy_vs_undersampling}, all four algorithms exhibit remarkably similar performance across the full range of tested sparsity and undersampling settings. In particular, the CoFEM algorithm with unknown noise variance performs on par with the variants that assume knowledge of the noise level. This observation is consistent with the findings reported in \cite{lin2022covariance}, where CoFEM and EM methods were shown to yield nearly identical reconstruction accuracy under equivalent settings.
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_sparsity_EMCoFEM.png}
     \caption{Reconstruction accuracy (NRMSE) versus sparsity level $ \rho $. All four EM variants show near-identical behavior.}
     \label{fig:accuracy_vs_sparsity}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_undersampling_EMCoFEM.png}
     \caption{Reconstruction accuracy (NRMSE) versus undersampling factor $ \delta $. Similar performance is observed across all algorithms.}
@@ -216,44 +216,142 @@ Given these results, and in order to simplify subsequent analysis, I choose to f
 
 \paragraph{Fourier Matrix}
 As soon as the measurement matrix $\Phi$ gets changed from Gaussian to a matrix representing a Fourier Transform, thinks change rapidly. The diagonal Estimation of the CoFEM algorithm had to be modified so that both  
-\begin{figure}[h]
+
+\begin{figure}[H]
     \centering
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Figures/accuracy_vs_undersampling_FFTGauss_EM.png}
-        \caption{First subfigure}
-        \label{fig:sub1}
-    \end{subfigure}
-    \hfill % Adds horizontal space
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Figures/accuracy_vs_sparsity_FFTGauss_EM.png}
-        \caption{Second subfigure}
-        \label{fig:sub2}
-    \end{subfigure}
-    
-    \vspace{0.5cm} % Adds vertical space between rows
-    
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Figures/accuracy_vs_undersampling_FFTGauss_CoFEM.png}
-        \caption{Third subfigure}
-        \label{fig:sub3}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{Figures/accuracy_vs_sparsity_FFTGauss_CoFEM.png}
-        \caption{Fourth subfigure}
-        \label{fig:sub4}
-    \end{subfigure}
-    
-    \caption{Four figures arranged in a 2×2 grid.}
-    \label{fig:grid}
+    \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_undersampling_FFTGauss_EM.png}
+    \caption{Reconstruction accuracy (NRMSE) versus undersampling factor $ \delta $.}
+    \label{fig:accuracy_vs_undersampling_EM_gaussFFT}
 \end{figure}
 
-\section{Sparse Bayesian Learning with Steins Unbiased Risk Estimate}
-\subsection{Steins Lemma}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_sparsity_FFTGauss_EM.png}
+    \caption{Reconstruction accuracy (NRMSE) versus undersampling factor $ \delta $.}
+    \label{fig:accuracy_vs_sparsity_EM_gaussFFT}
+\end{figure}
+
+
+\section{Sparse Baysian Learning with Stein's Unbiased Risk Estimate}
+\subsection{Stein's Lemma}
+Stein's Lemma provides a fundamental relationship between the expectation of a function of a Gaussian random variable and its derivative. For the univariate case, let $Z \sim \mathcal{N}(0, 1)$ and $f: \mathbb{R} \to \mathbb{R}$ be an absolutely continuous function with derivative $f'$ satisfying $\mathbb{E}|f'(Z)| < \infty$. Then, Stein's Lemma states:
+
+\begin{equation}
+    \mathbb{E}[Zf(Z)] = \mathbb{E}[f'(Z)]
+\end{equation}
+
+The proof follows from integration by parts and leverages the property of the standard normal density $\phi(z)$, where $\phi'(z) = -z\phi(z)$ \cite{Tibshirani2015SteinS}. This result extends to $X \sim \mathcal{N}(\mu, \sigma^2)$ through standardization:
+
+\begin{equation}
+    \frac{1}{\sigma^2}\mathbb{E}[(X - \mu)f(X)] = \mathbb{E}[f'(X)]
+\end{equation}
+
+For the multivariate case, let $\mathbf{X} \sim \mathcal{N}(\boldsymbol{\mu}, \sigma^2 \mathbf{I}_n)$ and let $f: \mathbb{R}^n \to \mathbb{R}$ be an almost differentiable function with gradient $\nabla f$. Stein's Multivariate Lemma states:
+
+\begin{equation}
+    \frac{1}{\sigma^2}\mathbb{E}[(\mathbf{X} - \boldsymbol{\mu})f(\mathbf{X})] = \mathbb{E}[\nabla f(\mathbf{X})]
+\end{equation}
+
+This is proved by applying the univariate lemma component-wise and using Fubini's theorem under the almost differentiability condition \cite{Tibshirani2015SteinS}. The lemma enables covariance estimation without explicit knowledge of $\boldsymbol{\mu}$, replacing it with computable partial derivatives.
+
+\subsection{Stein's Unbiased Risk Estimate (SURE)}
+For a Gaussian model $\mathbf{y} \sim \mathcal{N}(\boldsymbol{\mu}, \sigma^2 \mathbf{I}_n)$ and estimator $\boldsymbol{\hat{\mu}}(\mathbf{y})$, the risk $R = \mathbb{E}\|\boldsymbol{\mu} - \boldsymbol{\hat{\mu}}\|_2^2$ can be decomposed as:
+
+\begin{equation}
+R = -n\sigma^2 + \mathbb{E}\|\mathbf{y} - \boldsymbol{\hat{\mu}}\|_2^2 + 2\sigma^2 \sum_{i=1}^n \text{Cov}(y_i, \hat{\mu}_i)
+\end{equation}
+
+
+Using Stein's Lemma, the covariance term is replaced with partial derivatives when $\boldsymbol{\hat{\mu}}$ is almost differentiable. This yields Stein's Unbiased Risk Estimate (SURE):
+
+\begin{equation}
+    \widehat{R} = -n\sigma^2 + \|\mathbf{y} - \boldsymbol{\hat{\mu}}\|_2^2 + 2\sigma^2 \sum_{i=1}^n \frac{\partial \hat{\mu}_i}{\partial y_i}(\mathbf{y})
+\end{equation}
+
+SURE provides an unbiased risk estimator ($\mathbb{E}[\widehat{R}] = R$) without requiring knowledge of $\boldsymbol{\mu}$ \cite{Tibshirani2015SteinS}. For estimators depending on tuning parameters $\lambda$, SURE enables model selection through:
+
+\begin{equation}
+\hat{\lambda} = \underset{\lambda \in \Lambda}{\arg\min} \left( \|\mathbf{y} - \boldsymbol{\hat{\mu}}_\lambda\|_2^2 + 2\sigma^2 \sum_{i=1}^n \frac{\partial \hat{\mu}_{\lambda,i}}{\partial y_i}(\mathbf{y}) \right)
+\end{equation}
+
+
+This framework has become instrumental for risk estimation and hyperparameter optimization in high-dimensional statistics.
+
+\subsection{Algorithm Design for SBL with SURE}
+The implementation of Sparse Bayesian Learning (SBL) with Stein's Unbiased Risk Estimator (SURE) was planned based on the theoretical framework presented in \cite{slockSURE}. In this setting, we consider the linear model:
+
+\begin{equation}
+    \mathbf{y} = \mathbf{A}\mathbf{x} + \mathbf{v}, \quad \mathbf{v} \sim \mathcal{N}(\mathbf{v}; \mathbf{0}, \sigma^2 \mathbf{I}), \quad \mathbf{x} \sim \mathcal{N}(\mathbf{x}; \mathbf{0}, \mathbf{P}),
+\end{equation}
+
+where $\mathbf{y}$ represents the observed data, $\mathbf{A}$ is the measurement matrix, $\mathbf{x}$ is the sparse signal of interest, and $\mathbf{v}$ is additive Gaussian noise. The prior on $\mathbf{x}$ is Gaussian with covariance $\mathbf{P}$, which is typically diagonal to enforce sparsity. The posterior distribution of $\mathbf{x}$ given $\mathbf{y}$ is derived as:
+
+\begin{equation}
+    \mathbf{x}|\mathbf{y} \sim \mathcal{N}\left(\mathbf{x}; \mathbf{P}\mathbf{A}^T\mathbf{R}^{-1}\mathbf{y}, \mathbf{P} - \mathbf{P}\mathbf{A}^T\mathbf{R}^{-1}\mathbf{A}\mathbf{P}\right),
+\end{equation}
+
+where $\mathbf{R} = \mathbf{A}\mathbf{P}\mathbf{A}^T + \sigma^2 \mathbf{I}$. Alternatively, this can be rewritten as:
+
+\begin{equation}
+    \mathbf{x}|\mathbf{y} \sim \mathcal{N}\left(\mathbf{x}; \mathbf{S}^{-1}\mathbf{A}^T\mathbf{y}, \sigma^2 \mathbf{S}^{-1}\right),
+\end{equation}
+
+with $\mathbf{S} = \mathbf{A}^T\mathbf{A} + \sigma^2 \mathbf{P}^{-1}$. 
+
+\subsection{Connection to Tipping's Fast Marginal Likelihood Algorithm}
+The posterior expressions derived above align with the sparse Bayesian framework described in \cite{tipp2003fastsb}. By adopting the notation used in Tipping's paper, where $\mathbf{A} \rightarrow \boldsymbol{\Phi}$, $\mathbf{y} \rightarrow \mathbf{t}$, $\mathbf{x} \rightarrow \mathbf{w}$, and $\mathbf{P} \rightarrow \mathbf{A}^{-1}$, the posterior mean and covariance become:
+
+\begin{equation}
+    \boldsymbol{\mu} = \sigma^{-2}\boldsymbol{\Sigma}\boldsymbol{\Phi}^T\mathbf{t}, \quad \boldsymbol{\Sigma} = \left(\mathbf{A} + \sigma^{-2}\boldsymbol{\Phi}^T\boldsymbol{\Phi}\right)^{-1}.
+\end{equation}
+
+These expressions are identical to those derived in \cite{tipping2003} for the posterior distribution of the weights $\mathbf{w}$ in the sparse Bayesian learning framework. This equivalence confirms that the Fast Marginal Likelihood Maximisation algorithm proposed by Tipping can be directly applied to implement SBL with SURE in our setting.
+
+The algorithm proceeds as follows:
+\begin{enumerate}
+    \item Initialize the hyperparameters $\boldsymbol{\alpha}$ and noise variance $\sigma^2$.
+    \item Compute the posterior statistics $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ using the current hyperparameters.
+    \item Evaluate the marginal likelihood and update $\boldsymbol{\alpha}$ by sequentially adding, deleting, or re-estimating basis functions to maximize the marginal likelihood.
+    \item Iterate until convergence, ensuring that the hyperparameters and noise variance are optimized for minimal mean squared error (MSE) as guided by SURE.
+\end{enumerate}
+
+This approach leverages the efficiency of Tipping's algorithm while incorporating the risk estimation principles of SURE to optimize hyperparameters. The result is a computationally tractable implementation of SBL that maintains sparsity and generalizes well, as demonstrated in the experiments reported in \cite{tipping2003}.
+
+\subsection{Implementation of the Fast Marginal Likelihood Algorithm}
+
+The Fast Marginal Likelihood Algorithm is implemented through an efficient basis selection and pruning strategy. Unlike traditional SBL approaches that update all basis functions simultaneously, this implementation sequentially evaluates individual basis functions to maximize the marginal likelihood more efficiently.
+
+The algorithm begins by initializing a single most relevant basis function, selected by evaluating the correlation between each basis vector and the target signal. All other basis functions are initially deactivated by setting their corresponding $\alpha$ values to infinity. This sparse initialization provides a computationally efficient starting point.
+
+During each iteration, the algorithm considers three possible actions for each basis function:
+\begin{itemize}
+\item Adding a currently inactive basis ($\alpha = \infty$)
+\item Deleting an active basis from the model
+\item Re-estimating the $\alpha$ value of an active basis
+\end{itemize}
+
+For each potential action, the algorithm computes the change in marginal likelihood ($\Delta L$) that would result. This computation involves two key quantities for each basis i:
+\begin{itemize}
+\item The sparsity factor $S_i$, measuring the potential sparsity contribution
+\item The quality factor $Q_i$, indicating the basis function's alignment with the target
+\end{itemize}
+
+These factors are efficiently computed using the current model state without requiring full matrix inversions. The algorithm then selects the action that yields the largest positive change in marginal likelihood. If no action provides sufficient improvement ($\Delta L$ < threshold), the algorithm terminates.
+
+The posterior statistics ($\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$) are maintained and updated efficiently after each action. For addition and re-estimation, only the affected elements of $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ need to be recomputed. When deleting a basis, the algorithm efficiently downdates the model parameters.
+
+This sequential approach provides several advantages:
+\begin{itemize}
+\item Computational efficiency through selective updates
+\item Natural sparsity promotion through explicit basis selection
+\item Robust convergence through guaranteed marginal likelihood improvements
+\item Automatic determination of model complexity
+\end{itemize}
+
+The implementation handles both real and complex-valued inputs, with appropriate conjugate operations for complex matrices. The noise precision $\beta$ ($1/\sigma^2$) can either be specified or estimated from the data during optimization.
+
+This efficient implementation enables the algorithm to handle high-dimensional problems while maintaining sparsity and achieving fast convergence, typically requiring fewer iterations than traditional SBL approaches.
+
 
 \bibliographystyle{ieeetr}   % Or another style: plain, abbrv, unsrt, etc.
 \bibliography{Compressive_Sensing_Report}    

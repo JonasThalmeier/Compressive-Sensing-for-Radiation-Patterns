@@ -99,9 +99,8 @@ class SBL_CoFEM:
         # X = self._conj_grad(A, B)
         
        # Construct matrix A explicitly: A = βΦ^T Φ + diag{α}
-        PhiT_Phi = self.Phi.T @ self.Phi  # Shape: (D, D)
+        PhiT_Phi = self.Phi.conj().T @ self.Phi  # Shape: (D, D)
         A = self.beta * PhiT_Phi + np.diag(self.alpha)  # Shape: (D, D)
-        A = self.beta*PhiT_Phi + np.diag(self.alpha)  # Shape: (D, D)
     
         # Solve system AX = B^T
         # B has shape (K+1, D), so B^T has shape (D, K+1)
@@ -115,7 +114,7 @@ class SBL_CoFEM:
         # Compute variances sj = 1/K Σ(pk,j * xk,j)
         # s = np.mean(probes * x, axis=0)
         # s = (1 / self.beta) * np.clip(np.mean(probes * x, axis=1), 0, None)
-        s = np.clip(np.mean(np.conj(probes) * x, axis=1), 0, None)        
+        s = np.clip(np.mean(np.conj(probes) * x, axis=1), a_min=0, a_max=None)        
         return mu, s
     
     def maximize(self, mu: np.ndarray, s: np.ndarray):

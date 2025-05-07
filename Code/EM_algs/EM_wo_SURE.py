@@ -24,7 +24,8 @@ class SBL_EM:
         self.real = np.allclose(Phi, Phi.real) and np.allclose(t, t.real)
         
         # Initialize hyperparameters
-        self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
+        # self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
+        self.alpha = 1e-1*np.ones(self.D)
         if beta_in is _sentinel:
             self.beta = 1.0  # Noise precision (1/sigma^2)
         else:
@@ -41,7 +42,7 @@ class SBL_EM:
     def maximize(self, mu, Sigma):
         """M-step: Update hyperparameters alpha and beta"""
         # Update alpha (variance of weights)
-        self.alpha = 1/(np.square(mu) + np.diag(Sigma))
+        self.alpha = 1/(np.square(np.abs(mu)) + np.diag(np.abs(Sigma)))
 
         # Update beta (noise precision)
         if self.beta_in is _sentinel:
@@ -49,8 +50,12 @@ class SBL_EM:
         
             error = self.t - self.Phi @ mu
             sum = np.sum(1 - self.alpha * np.diag(Sigma))
-            #self.beta = (self.N - sum) / (np.sum(np.square(error)))
-            self.beta = self.N/(np.sum(np.square(error))+sum/self.beta)
+            error_term = np.sum(np.square(np.abs(error))) if not self.real else np.sum(np.square(error))
+        
+            # Add small constant to prevent division by zero
+            eps = 1e-10
+            self.beta = self.N / (error_term + sum/self.beta + eps)
+            #self.beta = self.N/(np.sum(np.square(error))+sum/self.beta)
         
         # Use absolute value for complex error
         error = self.t - self.Phi @ mu
@@ -88,7 +93,7 @@ class SBL_EM:
             # Check convergence
             change = np.max(np.abs(old_mu - mu))
             MSE = np.linalg.norm(self.t-self.Phi@mu)/np.linalg.norm(self.t)
-            if change < 1e-2 and MSE<self.threshold:
+            if change < 1e-4 and MSE<self.threshold:
                 print(f"Converged after {iter+1} iterations")
                 break
                 

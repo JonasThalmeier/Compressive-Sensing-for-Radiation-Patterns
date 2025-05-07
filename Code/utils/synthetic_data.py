@@ -37,7 +37,9 @@ def generate_synthetic_data(N, D, rho, sigma, seed=42, FFT=True):
     w[nonzero_indices] = np.random.randn(num_nonzero)  # Assign random values to non-zero elements
 
     # Step 4: Generate noise e (length N)
-    e = np.random.normal(0, sigma, N)
+    e = np.random.normal(0, sigma, N).astype(np.complex_)
+    if FFT:
+        e += 1j * np.random.normal(0, sigma, N).astype(np.complex_)
 
     # Step 5: Compute t = Phi * w + e
     t = Phi @ w + e
