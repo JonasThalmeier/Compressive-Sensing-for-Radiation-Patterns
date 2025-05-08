@@ -25,7 +25,7 @@ class SBL_EM:
         
         # Initialize hyperparameters
         # self.alpha = np.ones(self.D)  # Hyperparameters for precision of w
-        self.alpha = 1e-1*np.ones(self.D)
+        self.alpha = np.ones(self.D)
         if beta_in is _sentinel:
             self.beta = 1.0  # Noise precision (1/sigma^2)
         else:

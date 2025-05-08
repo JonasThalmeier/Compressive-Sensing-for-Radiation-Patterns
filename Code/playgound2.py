@@ -4,18 +4,25 @@ from utils.synthetic_data import generate_synthetic_data
 from EM_algs.EM_wo_SURE import SBL_EM
 from EM_algs.SBL_Fast import SBL_Fast
 from utils.plot_settings import get_figsize, LINE_STYLES, DPI
+from utils.synthetic_data_vector import generate_synthetic_data_vec
 import os
+from EM_algs.SBL_Fast_Vector import SBL_Fast_Vector
 
-base_dir = os.path.dirname(__file__)  # Only go up once since we're already in /Code
-data_dir = os.path.join(base_dir, "data")
-data_file = os.path.join(data_dir, "sparsity_data_EMvsSB.npz")
-data = np.load(data_file)
-rho_vals = data['rho_vals']
-em_Gauss_err = data['em_Gauss_err']
-em_FFT_err = data['em_FFT_err']
-sb_Gauss_err = data['sb_Gauss_err']
-sb_FFT_err = data['sb_FFT_err']
-print(em_FFT_err)
-print(em_Gauss_err)
-print(sb_FFT_err)
-print(sb_Gauss_err)
+
+
+if __name__ == "__main__":
+    # Generate synthetic data
+    N = 50  # Length of time-domain signal
+    D = 150  # Length of frequency-domain signal (D > N)
+    L = 3
+    rho = 0.1  # Sparsity factor
+    sigma = 0.01  # Standard deviation of noise
+    threshold = 1e-6  # Convergence threshold
+    max_iter = 200
+    t, Phi, w_true, e = generate_synthetic_data_vec(N, D, L, rho, sigma)
+    print(f"t.shape: {t.shape}, Phi.shape: {Phi.shape}, w_true.shape: {w_true.shape}, e.shape: {e.shape}")
+    # Run both algorithms for comparison
+    
+    # Run CoFEM
+    sbl_vec = SBL_Fast_Vector(t, Phi, max_iter=max_iter, threshold=threshold)
+    w_est, _ = sbl_vec.fit()

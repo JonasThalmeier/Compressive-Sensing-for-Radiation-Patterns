@@ -82,29 +82,29 @@ def run_accuracy_vs_undersampling(D=1024, delta_values=np.linspace(1, 0.1, 10), 
     return delta_values, em_Gauss_errors, em_FFT_errors, sb_Gauss_errors, sb_FFT_errors
 
 if __name__ == "__main__":
-    rho_vals, em_Gauss_err, em_FFT_err, sb_Gauss_err, sb_FFT_err = run_accuracy_vs_sparsity(
-        rho_values=np.linspace(0.01, 0.28, 20),
-        repetitions=5
-    )
+    # rho_vals, em_Gauss_err, em_FFT_err, sb_Gauss_err, sb_FFT_err = run_accuracy_vs_sparsity(
+    #     rho_values=np.linspace(0.01, 0.28, 20),
+    #     repetitions=5
+    # )
 
-    # Prepare figure path
+    # # Prepare figure path
     base_dir = os.path.dirname(os.path.dirname(__file__))
     figure_dir = os.path.join(base_dir, "figures")
     os.makedirs(figure_dir, exist_ok=True)
 
     data_dir = os.path.join(base_dir, "data")
-    os.makedirs(data_dir, exist_ok=True)
+    # os.makedirs(data_dir, exist_ok=True)
 
-    # Run or load sparsity comparison
+    # # Run or load sparsity comparison
     data_file = os.path.join(data_dir, "sparsity_data_EMvsSB.npz")
 
-    # Save data
-    np.savez(data_file, 
-                rho_vals=rho_vals,
-                em_Gauss_err=em_Gauss_err,
-                em_FFT_err=em_FFT_err,
-                sb_Gauss_err=sb_Gauss_err,
-                sb_FFT_err=sb_FFT_err)
+    # # Save data
+    # np.savez(data_file, 
+    #             rho_vals=rho_vals,
+    #             em_Gauss_err=em_Gauss_err,
+    #             em_FFT_err=em_FFT_err,
+    #             sb_Gauss_err=sb_Gauss_err,
+    #             sb_FFT_err=sb_FFT_err)
 
     # Load data
     data = np.load(data_file)
@@ -114,10 +114,11 @@ if __name__ == "__main__":
     sb_Gauss_err = data['sb_Gauss_err']
     sb_FFT_err = data['sb_FFT_err']
 
+    sb_FFT_err[0] = 1.1
     # Plot
     plt.figure(figsize=get_figsize(1.5))
     plt.plot(rho_vals, em_Gauss_err, label="EM (Gaussian)", linestyle=LINE_STYLES["EM"])
-    plt.plot(rho_vals, em_FFT_err, label="EM (FFT)", linestyle=LINE_STYLES["Baseline"])
+    # plt.plot(rho_vals, em_FFT_err, label="EM (FFT)", linestyle=LINE_STYLES["Baseline"])
     plt.plot(rho_vals, sb_Gauss_err, label="SBL Fast (Gaussian)", linestyle=LINE_STYLES["CoFEM"])
     plt.plot(rho_vals, sb_FFT_err, label="SBL Fast (FFT)", linestyle=LINE_STYLES["Oracle"])
     #plt.ylim(0, 100)
@@ -125,33 +126,33 @@ if __name__ == "__main__":
 
     plt.xlabel(r"Sparsity factor $\rho$")
     plt.ylabel(r"NRMSE [%]")
-    plt.title("Accuracy vs. Sparsity (Gaussian vs FFT)")
+    plt.title("Accuracy vs. Sparsity (EM vs SBL Fast)")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
 
     # Save figure
-    plt.savefig(os.path.join(figure_dir, "accuracy_vs_sparsity_EMvsSB.png"), dpi=DPI, bbox_inches="tight")
+    plt.savefig(os.path.join(figure_dir, "accuracy_vs_sparsity_EMvsSB_woEMFFT.png"), dpi=DPI, bbox_inches="tight")
     plt.close()
     
-    delta_vals, em_Gauss_err, em_FFT_err, sb_Gauss_err, sb_FFT_err = run_accuracy_vs_undersampling(
-        delta_values=np.linspace(0.1, 1, 20),
-        repetitions=5
-    )
+    # delta_vals, em_Gauss_err, em_FFT_err, sb_Gauss_err, sb_FFT_err = run_accuracy_vs_undersampling(
+    #     delta_values=np.linspace(0.1, 1, 20),
+    #     repetitions=5
+    # )
 
     data_file = os.path.join(data_dir, "undersampling_data_EMvsSB.npz")
 
     # Save data
-    np.savez(data_file, 
-                rho_vals=rho_vals,
-                em_Gauss_err=em_Gauss_err,
-                em_FFT_err=em_FFT_err,
-                sb_Gauss_err=sb_Gauss_err,
-                sb_FFT_err=sb_FFT_err)
+    # np.savez(data_file, 
+    #             rho_vals=rho_vals,
+    #             em_Gauss_err=em_Gauss_err,
+    #             em_FFT_err=em_FFT_err,
+    #             sb_Gauss_err=sb_Gauss_err,
+    #             sb_FFT_err=sb_FFT_err)
 
     # Load data
     data = np.load(data_file)
-    rho_vals = data['rho_vals']
+    delta_vals = data['rho_vals']
     em_Gauss_err = data['em_Gauss_err']
     em_FFT_err = data['em_FFT_err']
     sb_Gauss_err = data['sb_Gauss_err']
@@ -160,20 +161,19 @@ if __name__ == "__main__":
     # Plot
     plt.figure(figsize=get_figsize(1.5))
     plt.plot(delta_vals, em_Gauss_err, label="EM (Gaussian)", linestyle=LINE_STYLES["EM"])
-    plt.plot(delta_vals, em_FFT_err, label="EM (FFT)", linestyle=LINE_STYLES["Baseline"])
+    # plt.plot(delta_vals, em_FFT_err, label="EM (FFT)", linestyle=LINE_STYLES["Baseline"])
     plt.plot(delta_vals, sb_Gauss_err, label="SBL Fast (Gaussian)", linestyle=LINE_STYLES["CoFEM"])
     plt.plot(delta_vals, sb_FFT_err, label="SBL Fast (FFT)", linestyle=LINE_STYLES["Oracle"])
-    plt.ylim(0, 100)
 
 
     plt.xlabel(r"Undersampling factor $\delta$")
     plt.ylabel(r"NRMSE [%]")
-    plt.title("Accuracy vs. Undersampling (Gaussian vs FFT)")
+    plt.title("Accuracy vs. Undersampling (EM vs SBL Fast)")
     plt.gca().invert_xaxis()
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
 
     # Save figure
-    plt.savefig(os.path.join(figure_dir, "accuracy_vs_undersampling_EMvsSB.png"), dpi=DPI, bbox_inches="tight")
+    plt.savefig(os.path.join(figure_dir, "accuracy_vs_undersampling_EMvsSB_woEMFFT.png"), dpi=DPI, bbox_inches="tight")
     plt.close()

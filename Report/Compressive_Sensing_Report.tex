@@ -191,6 +191,7 @@ While the CoFEM algorithm achieves a noticeable speedup over the standard EM alg
 
 \subsection{Performance Comparison of EM Algorithms}
 \paragraph{Gaussian Matrix}
+\label{sec:PerfEMCoFEMGauss}
 To compare the performance of different EM-based Sparse Bayesian Learning algorithms, experiments were conducted using synthetic data generated from Gaussian dictionaries, varying both the sparsity level $ \rho $ and the undersampling factor $ \delta = N/D $. Four variants were considered: standard EM and CoFEM, each with known and unknown noise variance. The normalized root mean squared error (NRMSE) was used to evaluate reconstruction quality. Results are averaged over multiple random trials to ensure statistical robustness.
 
 The signal dimension was fixed to $ D = 1024 $. For the sparsity analysis the undersampling factor was fixed at $ \delta = 0.25 $, corresponding to $ N = \lfloor \delta D \rfloor $ measurements. For the undersampling analysis, the sparsity level was fixed at $ \rho = 0.06 $. The measurement matrix was drawn from a standard Gaussian distribution. Additive Gaussian noise with standard deviation $ \sigma = 0.01 $ was added to the measurements. For each setting, the reported results represent the average over five random trials to account for variability due to random initialization and noise.
@@ -214,8 +215,14 @@ As shown in Figure \ref{fig:accuracy_vs_sparsity} and Figure \ref{fig:accuracy_v
 
 Given these results, and in order to simplify subsequent analysis, I choose to focus on the CoFEM algorithm with unknown noise variance in the remainder of this report. This choice is motivated by its computational scalability, the practical advantage of not requiring prior knowledge of the noise level, and the observation that its reconstruction performance closely matches that of other EM-based approaches in the tested settings. While this similarity may not generalize to all scenarios, it provides a reasonable basis for concentrating on a single representative method in this context.
 
+
 \paragraph{Fourier Matrix}
-As soon as the measurement matrix $\Phi$ gets changed from Gaussian to a matrix representing a Fourier Transform, thinks change rapidly. The diagonal Estimation of the CoFEM algorithm had to be modified so that both  
+When the measurement matrix $\Phi$ is changed from a Gaussian random matrix to one representing a subsampled Fourier transform, several complications arise. Both the EM and CoFEM algorithms were adapted accordingly, replacing standard transposes with conjugate transposes and applying further minor modifications to support complex-valued inputs. Multiple approaches were explored to enable accurate diagonal estimation within the CoFEM framework under complex-valued settings; however, none of them yielded satisfactory results.
+
+Despite these efforts, the EM algorithm continued to show unstable behavior. The initialization of the hyperparameter vector $\boldsymbol{\alpha}$ was found to significantly influence the outcome. In some instances, the algorithm converged to solutions with accuracy comparable to those obtained in the Gaussian matrix setting (Figure \ref{fig:accuracy_vs_sparsity_EM_gaussFFT}). In other cases, however, it resulted in drastically increased MSE values (Figure \ref{fig:accuracy_vs_undersampling_EM_gaussFFT}). This instability, combined with the sensitivity to initialization, rendered the EM approach unreliable for complex-valued measurement matrices.
+
+In contrast, the algorithm described in Section \ref{sec:SBL_SURE}, which incorporates Sparse Bayesian Learning with SURE-based hyperparameter optimization, demonstrated more stable and consistent performance in the complex-valued setting. As a result, further efforts to adapt the EM algorithm for this case were discontinued.
+
 
 \begin{figure}[H]
     \centering
@@ -233,6 +240,7 @@ As soon as the measurement matrix $\Phi$ gets changed from Gaussian to a matrix 
 
 
 \section{Sparse Baysian Learning with Stein's Unbiased Risk Estimate}
+\label{sec:SBL_SURE}
 \subsection{Stein's Lemma}
 Stein's Lemma provides a fundamental relationship between the expectation of a function of a Gaussian random variable and its derivative. For the univariate case, let $Z \sim \mathcal{N}(0, 1)$ and $f: \mathbb{R} \to \mathbb{R}$ be an absolutely continuous function with derivative $f'$ satisfying $\mathbb{E}|f'(Z)| < \infty$. Then, Stein's Lemma states:
 
@@ -305,7 +313,7 @@ The posterior expressions derived above align with the sparse Bayesian framework
     \boldsymbol{\mu} = \sigma^{-2}\boldsymbol{\Sigma}\boldsymbol{\Phi}^T\mathbf{t}, \quad \boldsymbol{\Sigma} = \left(\mathbf{A} + \sigma^{-2}\boldsymbol{\Phi}^T\boldsymbol{\Phi}\right)^{-1}.
 \end{equation}
 
-These expressions are identical to those derived in \cite{tipping2003} for the posterior distribution of the weights $\mathbf{w}$ in the sparse Bayesian learning framework. This equivalence confirms that the Fast Marginal Likelihood Maximisation algorithm proposed by Tipping can be directly applied to implement SBL with SURE in our setting.
+These expressions are identical to those derived in \cite{tipp2003fastsb} for the posterior distribution of the weights $\mathbf{w}$ in the sparse Bayesian learning framework. This equivalence confirms that the Fast Marginal Likelihood Maximisation algorithm proposed by Tipping can be directly applied to implement SBL with SURE in our setting.
 
 The algorithm proceeds as follows:
 \begin{enumerate}
@@ -315,7 +323,7 @@ The algorithm proceeds as follows:
     \item Iterate until convergence, ensuring that the hyperparameters and noise variance are optimized for minimal mean squared error (MSE) as guided by SURE.
 \end{enumerate}
 
-This approach leverages the efficiency of Tipping's algorithm while incorporating the risk estimation principles of SURE to optimize hyperparameters. The result is a computationally tractable implementation of SBL that maintains sparsity and generalizes well, as demonstrated in the experiments reported in \cite{tipping2003}.
+This approach leverages the efficiency of Tipping's algorithm while incorporating the risk estimation principles of SURE to optimize hyperparameters. The result is a computationally tractable implementation of SBL that maintains sparsity and generalizes well, as demonstrated in the experiments reported in \cite{tipp2003fastsb}.
 
 \subsection{Implementation of the Fast Marginal Likelihood Algorithm}
 
@@ -351,6 +359,71 @@ This sequential approach provides several advantages:
 The implementation handles both real and complex-valued inputs, with appropriate conjugate operations for complex matrices. The noise precision $\beta$ ($1/\sigma^2$) can either be specified or estimated from the data during optimization.
 
 This efficient implementation enables the algorithm to handle high-dimensional problems while maintaining sparsity and achieving fast convergence, typically requiring fewer iterations than traditional SBL approaches.
+
+\section{Comparative Analysis of EM and SBL-SURE Methodologies}
+\subsection{Accuracy vs. Undersampling and Sparsity}
+To evaluate the performance of both the SBL-SURE framework and the EM algorithm, we replicated the experimental conditions outlined in Section~\ref{sec:PerfEMCoFEMGauss}. While EM and CoFEM exhibited nearly identical reconstruction accuracy in Gaussian measurement systems, the EM algorithm proved unstable for complex-valued (FFT-based) dictionaries, frequently failing to converge. Consequently, EM results for the complex case were excluded from this comparison. Notably, in the rare instances where EM did converge for complex systems, its reconstruction error aligned with its Gaussian performance, suggesting no inherent disadvantage in complex domains—only algorithmic instability.
+
+Tipping’s Fast Marginal Likelihood algorithm, however, demonstrated robust performance across both Gaussian and complex-valued systems. As shown in Figures \ref{fig:accuracy_vs_undersampling_EMSB} and \ref{fig:accuracy_vs_sparsity_EMSB}, its accuracy in Gaussian systems closely matched EM’s, with EM achieving marginal improvements (2–4\% NRMSE reduction or $\Delta\rho\approx 0.05$). Strikingly, in complex-valued systems, Tipping’s method outperformed its own Gaussian results—a paradoxical reversal of trends observed with EM. This suggests that the Fast Marginal Likelihood framework inherently adapts more effectively to structured dictionaries like Fourier bases, despite EM’s theoretical equivalence.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_undersampling_EMvsSB_woEMFFT.png}
+    \caption{Reconstruction accuracy (NRMSE) versus undersampling factor $\delta$. Tipping’s algorithm maintains consistent performance across Gaussian and complex systems, while EM (excluded here for instability) was restricted to Gaussian cases.}
+    \label{fig:accuracy_vs_undersampling_EMSB}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_sparsity_EMvsSB_woEMFFT.png}
+    \caption{Reconstruction accuracy (NRMSE) versus ground-truth sparsity ratio $\rho$. Tipping’s method excels in complex systems, achieving lower NRMSE than in Gaussian cases—a reversal of EM’s behavior.}
+    \label{fig:accuracy_vs_sparsity_EMSB}
+\end{figure}
+
+\subsection{Computational Efficiency}
+Figure \ref{fig:runtimeSBl} compares the execution times of EM, CoFEM, and the Fast Marginal Likelihood algorithm under standardized conditions:
+\begin{itemize}
+\item Sparsity ratio $ \rho = 0.1 $
+\item Noise variance $ \sigma^2 = 10^{-6} $
+\item Convergence criterion $\frac{|\mathbf{t} - \Phi \boldsymbol{\mu}|_2}{|\mathbf{t}|_2} < 10^{-2}$
+\end{itemize}
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/runtime_comp_EMCoFEMSBL.png}
+    \caption{Runtime versus measurement count $N$ for Gaussian dictionaries ($D=3N$). The Fast Marginal Likelihood algorithm exhibits the same computational efficiency as CoFEM and achieves significant speedups over EM, particularly at larger scales.}
+    \label{fig:runtimeSBl}
+\end{figure}
+
+\subsection{Sparsity}
+A critical distinction lies in how each algorithm enforces sparsity. Tipping’s method explicitly adds or prunes basis functions, yielding strictly sparse solutions. In contrast, EM gradually attenuates irrelevant weights toward near-zero values without exact truncation. Under low-noise conditions ($\sigma=0.01$), both methods successfully identify the true support while suppressing extraneous coefficients, as shown in Figures \ref{fig:weight01Gauss} and \ref{fig:weight01FFT}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/weight_comparison_Gaussian_simga0.01.png}
+    \caption{Weight magnitude comparisons (Gaussian dictionary, $\sigma=0.01$). Both algorithms recover the true support, though SBL produces strictly sparse estimates.}
+    \label{fig:weight01Gauss}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/weight_comparison_FFT_simga0.01.png}
+    \caption{Weight magnitude comparisons (complex-valued dictionary, $\sigma=0.01$). SBL’s explicit basis selection enhances sparsity enforcement in Fourier-like systems.}
+    \label{fig:weight01FFT}
+\end{figure}
+
+At higher noise levels ($\sigma=0.01$), Figures \ref{fig:weight001Gauss} and \ref{fig:weight001FFT} reveal comparable challenges: neither algorithm reliably identifies the true support, though SBL maintains stricter sparsity through its deletion mechanism.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/weight_comparison_Gaussian_simga0.1.png}
+    \caption{Weight estimates under moderate noise (Gaussian dictionary, $\sigma=0.01$). Both methods struggle with support recovery, though SBL avoids non-zero artifacts more effectively.}
+    \label{fig:weight001Gauss}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/weight_comparison_FFT_simga0.1.png}
+    \caption{Weight estimates under moderate noise (complex-valued dictionary, $\sigma=0.01$). Both methods struggle with support recovery, though SBL avoids non-zero artifacts more effectively.}
+    \label{fig:weight001FFT}
+\end{figure}
 
 
 \bibliographystyle{ieeetr}   % Or another style: plain, abbrv, unsrt, etc.
