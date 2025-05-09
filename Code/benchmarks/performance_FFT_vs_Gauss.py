@@ -4,6 +4,7 @@ from utils.synthetic_data import generate_synthetic_data
 from EM_algs.EM_wo_SURE import SBL_EM
 from EM_algs.CoFEM_wo_SURE import SBL_CoFEM
 from EM_algs.SBL_Fast import SBL_Fast
+from EM_algs.SBL_Fast_Vector import SBL_Fast_Vector
 from utils.plot_settings import get_figsize, LINE_STYLES, DPI
 import os
 
@@ -22,14 +23,14 @@ def run_accuracy_vs_sparsity(D=1024, rho_values=np.linspace(0.01, 0.5, 10), delt
 
             # CoFEM (FFT)
             t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=True, seed=42 + i)
-            sbl_cofem = SBL_EM(t, Phi,  max_iter=max_iter,
+            sbl_cofem = SBL_Fast(t, Phi,  max_iter=max_iter,
                                 threshold=threshold)
             w_cofem_known, _ = sbl_cofem.fit()
             FFT_errors[r] = relative_error(w_cofem_known, w_true)/repetitions
 
             # CoFEM (Gaussian)
-            t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=False, seed=42 + i)
-            sbl_cofem_free = SBL_EM(t, Phi,  max_iter=max_iter,
+            t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=True, seed=42 + i)
+            sbl_cofem_free = SBL_Fast_Vector(t, Phi,  max_iter=max_iter,
                                     threshold=threshold)
             w_cofem_learned, _ = sbl_cofem_free.fit()
             gauss_errors[r] = relative_error(w_cofem_learned, w_true)/repetitions
@@ -46,14 +47,14 @@ def run_accuracy_vs_undersampling(D=1024, delta_values=np.linspace(1, 0.1, 10), 
             N = int(np.floor(D*delta))
             # CoFEM (FFT)
             t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=True, seed=42 + i)
-            sbl_cofem = SBL_EM(t, Phi,  max_iter=max_iter,
+            sbl_cofem = SBL_Fast(t, Phi,  max_iter=max_iter,
                                 threshold=threshold)
             w_cofem_known, _ = sbl_cofem.fit()
             FFT_errors[d] = relative_error(w_cofem_known, w_true)/repetitions
 
             # CoFEM (Gaussian)
-            t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=False, seed=42 + i)
-            sbl_cofem_free = SBL_EM(t, Phi,  max_iter=max_iter,
+            t, Phi, w_true, _ = generate_synthetic_data(N, D, rho, sigma, FFT=True, seed=42 + i)
+            sbl_cofem_free = SBL_Fast_Vector(t, Phi,  max_iter=max_iter,
                                     threshold=threshold)
             w_cofem_learned, _ = sbl_cofem_free.fit()
             gauss_errors[d] = relative_error(w_cofem_learned, w_true)/repetitions
@@ -62,8 +63,9 @@ def run_accuracy_vs_undersampling(D=1024, delta_values=np.linspace(1, 0.1, 10), 
 
 if __name__ == "__main__":
     
-    rho_vals, FFT_errors, gauss_errors = run_accuracy_vs_sparsity(rho_values=np.linspace(0.01, 0.28, 20),repetitions=5, max_iter=50)
+    rho_vals, FFT_errors, gauss_errors = run_accuracy_vs_sparsity(D=512, rho_values=np.linspace(0.01, 0.28, 10),repetitions=1, max_iter=50)
     print(FFT_errors)
+    print(gauss_errors)
     # if np.all(np.isnan(FFT_errors)):
     #     y_limit = 70  # Fallback value
     # else:
@@ -88,24 +90,25 @@ if __name__ == "__main__":
 
     # Plot
     plt.figure(figsize=get_figsize(1.5))
-    plt.plot(rho_vals, FFT_errors, label="Fourier matrix", linestyle=LINE_STYLES["EM"])
-    plt.plot(rho_vals, gauss_errors, label="Gaussian", linestyle=LINE_STYLES["CoFEM"])
-    plt.ylim(0, 30)
+    plt.plot(rho_vals, FFT_errors, label="old", linestyle=LINE_STYLES["EM"])
+    plt.plot(rho_vals, gauss_errors, label="new", linestyle=LINE_STYLES["CoFEM"])
+    # plt.ylim(0, 30)
 
 
     plt.xlabel(r"Sparsity factor $\rho$")
     plt.ylabel(r"NRMSE [%]")
-    plt.title("Accuracy vs. Sparsity (EM)")
+    plt.title("Accuracy vs. Sparsity (old SBL vs new SBL)")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
 
     # Save figure
-    plt.savefig(os.path.join(figure_dir, "accuracy_vs_sparsity_FFTGauss_EM_v1.png"), dpi=DPI, bbox_inches="tight")
+    plt.savefig(os.path.join(figure_dir, "SBL_old_vs_new_spars.png"), dpi=DPI, bbox_inches="tight")
     plt.close()
 
-    delta_vals, FFT_errors, gauss_errors = run_accuracy_vs_undersampling(delta_values=np.linspace(0.1, 1, 20),repetitions=5,max_iter=50)
-    # print(FFT_errors)
+    delta_vals, FFT_errors, gauss_errors = run_accuracy_vs_undersampling(D=512, delta_values=np.linspace(0.1, 1, 10),repetitions=1,max_iter=50)
+    print(FFT_errors)
+    print(gauss_errors)
     # if np.all(np.isnan(FFT_errors)):
     #     y_limit = 70  # Fallback value
     # else:
@@ -126,18 +129,18 @@ if __name__ == "__main__":
 
     # Plot
     plt.figure(figsize=get_figsize(1.5))
-    plt.plot(delta_vals, FFT_errors, label="Fourier matrix", linestyle=LINE_STYLES["EM"])
-    plt.plot(delta_vals, gauss_errors, label="Gaussian", linestyle=LINE_STYLES["CoFEM"])
+    plt.plot(delta_vals, FFT_errors, label="old", linestyle=LINE_STYLES["EM"])
+    plt.plot(delta_vals, gauss_errors, label="new", linestyle=LINE_STYLES["CoFEM"])
     # plt.ylim(0, y_limit)
 
     plt.xlabel(r"Undersampling factor $\delta$")
     plt.ylabel(r"NRMSE [%]")
-    plt.title("Accuracy vs. Undersampling (CoFEM)")
+    plt.title("Accuracy vs. Undersampling (old SBL vs new SBL)")
     plt.gca().invert_xaxis()
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
 
     # Save figure
-    plt.savefig(os.path.join(figure_dir, "accuracy_vs_undersampling_FFTGauss_CoFEM_v1.png"), dpi=DPI, bbox_inches="tight")
+    plt.savefig(os.path.join(figure_dir, "SBL_old_vs_new_under.png"), dpi=DPI, bbox_inches="tight")
     plt.close()

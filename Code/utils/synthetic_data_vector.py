@@ -40,9 +40,10 @@ def generate_synthetic_data_vec(N, D, L, rho, sigma, seed=42):
 
     # Step 5: Compute t = Phi * w + e for each measurement
     t = np.zeros((N, L), dtype=np.complex_)
+    w = w.reshape(-1, 1).flatten()
     for l in range(L):
         # Fix: Reshape w and flatten the result of matrix multiplication
-        result = Phi[:, :, l] @ w.reshape(-1, 1)  # Shape: (N, 1)
+        result = Phi[:, :, l] @ w  # Shape: (N, 1)
         t[:, l] = result.flatten() + e[:, l]      # Now shapes match: (N,) + (N,)
 
     return t, Phi, w, e
