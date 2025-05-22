@@ -160,5 +160,5 @@ Initialize Fast SBL algorithm.
             self.update_model(action, i, new_alpha)
         w_est = np.zeros(self.D, dtype=complex)
         w_est[self.active_basis] = self.mu.flatten()
-        return w_est, None
+        return w_est, self.active_basis
         # return self.mu, np.array(self.active_basis)

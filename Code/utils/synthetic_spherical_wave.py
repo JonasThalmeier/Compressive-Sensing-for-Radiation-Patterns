@@ -8,14 +8,21 @@ def generate_spherical_wave(R=1, Theta_steps=18, Phi_steps=36, N_modes=50, c = 3
     np.random.seed(seed)
     # Step 1: Build matrix of spherical wave coefficients
     F = np.zeros((N, D, 3), dtype=np.complex_)
+    nms_idx = np.zeros((D,3))
+    ThetaPhi_idx = np.zeros((N,2))
     for Theta_idx, Theta in enumerate(np.linspace(1e-3, np.pi, Theta_steps)):
         for Phi_idx, Phi in enumerate(np.linspace(1e-3, 2*np.pi, Phi_steps)):
+            ThetaPhi_idx[Theta_idx*Phi_steps + Phi_idx, :] = [Theta, Phi]
             for n in np.arange(1, N_modes+1):
                 for m in np.arange(-n, n+1):
                     idx1 = (int(Theta_idx*Phi_steps + Phi_idx), int(n**2+n-1+m))
                     idx2 = (int(Theta_idx*Phi_steps + Phi_idx), int(n**2+n-1+m+D/2))
                     F[idx1[0], idx1[1], :], F[idx2[0], idx2[1], :] = Fmnc(m, n, c, R, Theta, Phi, k)
-
+    for n in np.arange(1, N_modes+1):
+                for m in np.arange(-n, n+1):
+                    nms_idx[int(n**2+n-1+m),:] = [n, m, 1]
+                    nms_idx[int(n**2+n-1+m+D/2),:] = [n, m, 2]
+    F = F/(np.max(np.abs(F), axis=(0,2))[np.newaxis, :, np.newaxis])  # Normalize F to avoid numerical issues
     # Step 2: Generate sparse vector w (length D)
     w = np.zeros(D)
     num_nonzero = int(rho * D)
@@ -34,4 +41,4 @@ def generate_spherical_wave(R=1, Theta_steps=18, Phi_steps=36, N_modes=50, c = 3
         result = F[:, :, l] @ w  # Shape: (N, 1)
         t[:, l] = result.flatten() + e[:, l]      # Now shapes match: (N,) + (N,)
 
-    return t, F, w, e
+    return t, F, w, e, nms_idx, ThetaPhi_idx

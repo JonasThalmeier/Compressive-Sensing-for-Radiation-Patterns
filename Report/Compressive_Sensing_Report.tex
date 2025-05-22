@@ -318,7 +318,7 @@ These expressions are identical to those derived in \cite{tipp2003fastsb} for th
 The algorithm proceeds as follows:
 \begin{enumerate}
     \item Initialize the hyperparameters $\boldsymbol{\alpha}$ and noise variance $\sigma^2$.
-    \item Compute the posterior statistics $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ using the current hyperparameters.
+    \item Initialize the set of active basis $\mathcal{A}$ and compute the posterior statistics $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ using the current hyperparameters.
     \item Evaluate the marginal likelihood and update $\boldsymbol{\alpha}$ by sequentially adding, deleting, or re-estimating basis functions to maximize the marginal likelihood.
     \item Iterate until convergence, ensuring that the hyperparameters and noise variance are optimized for minimal mean squared error (MSE) as guided by SURE.
 \end{enumerate}
@@ -330,23 +330,61 @@ This approach leverages the efficiency of Tipping's algorithm while incorporatin
 The Fast Marginal Likelihood Algorithm is implemented through an efficient basis selection and pruning strategy. Unlike traditional SBL approaches that update all basis functions simultaneously, this implementation sequentially evaluates individual basis functions to maximize the marginal likelihood more efficiently.
 
 The algorithm begins by initializing a single most relevant basis function, selected by evaluating the correlation between each basis vector and the target signal. All other basis functions are initially deactivated by setting their corresponding $\alpha$ values to infinity. This sparse initialization provides a computationally efficient starting point.
+    \begin{equation}
+    \begin{split}
+    \boldsymbol{\alpha_i} &= \infty \\
+    \sigma^2 &= 1/\beta = 0.1\sigma^2_{\boldsymbol{t}} \\
+    \theta_i &= \frac{\|\phi_i^* t\|}{\Re\{\phi_i^*\phi_i\}} \\
+    \mathcal{A} &= \underset{i}{\arg\max} \theta_i \\
+    \alpha_{i\in\mathcal{A}} &= \frac{\Re\{\phi_i^*\phi_i\}}{\theta_i-\sigma^2} \\
+    \Sigma &= (diag\{\alpha_\mathcal{A}\}+\beta\Phi_\mathcal{A}^H\Phi_\mathcal{A})^{-1} \\
+    \mu &= \beta\Sigma\Phi_\mathcal{A}^H\boldsymbol{t}
+    \end{split}
+    \end{equation}
+    Where $\phi_j$ is the j-th column of $\Phi$ and $\alpha_\mathcal{A}$/$\Phi_\mathcal{A}$ the hyperparameters/basis that are contained in the active basis $\mathcal{A}$
 
 During each iteration, the algorithm considers three possible actions for each basis function:
 \begin{itemize}
-\item Adding a currently inactive basis ($\alpha = \infty$)
-\item Deleting an active basis from the model
-\item Re-estimating the $\alpha$ value of an active basis
+\item Adding a currently inactive basis (if $\alpha = \infty$ and $q_i^2<s_i$)
+\item Deleting an active basis from the model (if $\alpha_i < \infty$ and $q_i^2 < s_i$)
+\item Re-estimating the $\alpha$ value of an active basis (if $\alpha > \infty$ and $q_i^2>s_i$)
 \end{itemize}
 
 For each potential action, the algorithm computes the change in marginal likelihood ($\Delta L$) that would result. This computation involves two key quantities for each basis i:
 \begin{itemize}
-\item The sparsity factor $S_i$, measuring the potential sparsity contribution
-\item The quality factor $Q_i$, indicating the basis function's alignment with the target
+\item The sparsity factor $s_i$, measuring the potential sparsity contribution
+\begin{equation}
+s_i = \begin{cases}
+  \frac{\alpha_iS_i}{\alpha_i-S_i}       & , \alpha_i < \infty \\
+  S_i         & , \alpha_i=\infty
+\end{cases}
+\end{equation}
+\item The quality factor $q_i$, indicating the basis function's alignment with the target
+\begin{equation}
+    q_i = \begin{cases}
+  \frac{\alpha_iQ_i}{\alpha_i-S_i}       & , \alpha_i < \infty \\
+  Q_i         & , \alpha_i=\infty
+\end{cases}
+\end{equation}
 \end{itemize}
+where:
+\begin{equation}
+    \begin{split}
+    S_i &= \beta \|\phi_i\|^2-\beta^2\|\Sigma(\phi_\mathcal{A}\Phi_i)\|^2 \\
+    Q_i &= \beta\phi_i^H\boldsymbol{t}-\beta^2\phi_i^H\Phi_\mathcal{A}\Sigma\Phi_\mathcal{A}^H\boldsymbol{t} \\
+    \end{split}
+\end{equation}
+    
+These factors are efficiently computed using the current model state without requiring full matrix inversions. The algorithm then selects the action that yields the largest positive change in marginal likelihood If no action provides sufficient improvement ($\Delta L$ < threshold), the algorithm terminates.
+\begin{equation}
+\begin{split}
+\Delta\mathcal{L}_i^{add} &= \frac{1}{2}\left(\frac{Q_i^2-S_i}{S-i}+\log\frac{S_i}{Q_i^2}\right) \\
+\Delta\mathcal{L}_i^{re-estimate} &= \frac{1}{2}\left(\frac{Q_i^2}{S_i+[\tilde{\alpha}_i^{-1}-\alpha_i^{-1}]^{-1}}-\log(1+S_i[\tilde{\alpha}_i^{-1}-\alpha_i^{-1}])\right) \\
+\Delta\mathcal{L}_i^{delete} &= \frac{1}{2}\left(\frac{Q_i^{-1}}{S_i-\alpha_i}-\log\left(1-\frac{S_i}{\alpha_i}\right)\right)
+\end{split}
+\end{equation}
 
-These factors are efficiently computed using the current model state without requiring full matrix inversions. The algorithm then selects the action that yields the largest positive change in marginal likelihood. If no action provides sufficient improvement ($\Delta L$ < threshold), the algorithm terminates.
-
-The posterior statistics ($\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$) are maintained and updated efficiently after each action. For addition and re-estimation, only the affected elements of $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ need to be recomputed. When deleting a basis, the algorithm efficiently downdates the model parameters.
+The posterior statistics ($\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$) are maintained and updated after each action. For addition and re-estimation, only the affected elements of $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ need to be recomputed. When deleting a basis, the algorithm efficiently downdates the model parameters.
 
 This sequential approach provides several advantages:
 \begin{itemize}
