@@ -66,7 +66,7 @@ def Fmnc(m, n, c, r, Theta, Phi, k):
     """
     factor = 1/np.sqrt(2*np.pi*n*(n+1))
     if m != 0:
-        factor *= (m/np.abs(m))**m
+        factor *= (-m/np.abs(m))**m
     barPnm_val = barPnm(n, np.abs(m), np.cos(Theta))
     dbarPnm_val = dbarPnmcosTheta_dTheta(n, np.abs(m), Theta)
     if c == 1:

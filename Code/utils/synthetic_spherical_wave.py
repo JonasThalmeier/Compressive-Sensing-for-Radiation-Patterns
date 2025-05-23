@@ -22,7 +22,7 @@ def generate_spherical_wave(R=1, Theta_steps=18, Phi_steps=36, N_modes=50, c = 3
                 for m in np.arange(-n, n+1):
                     nms_idx[int(n**2+n-1+m),:] = [n, m, 1]
                     nms_idx[int(n**2+n-1+m+D/2),:] = [n, m, 2]
-    F = F/(np.max(np.abs(F), axis=(0,2))[np.newaxis, :, np.newaxis])  # Normalize F to avoid numerical issues
+    # F = F/(np.max(np.abs(F), axis=(0,2))[np.newaxis, :, np.newaxis])  # Normalize F to avoid numerical issues
     # Step 2: Generate sparse vector w (length D)
     w = np.zeros(D)
     num_nonzero = int(rho * D)

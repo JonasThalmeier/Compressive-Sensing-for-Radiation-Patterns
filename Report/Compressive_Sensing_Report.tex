@@ -1,18 +1,18 @@
 \documentclass{article}
 
 % Packages you should include
-\usepackage[utf8]{inputenc}     % Character encoding
+\usepackage[utf8]{inputenc}
 \usepackage{amsmath, amssymb}   % Math support (optional)
-\usepackage{cite}               % Optional, for numeric-style compressed citations
 \usepackage{graphicx}           % Optional, for figures
 \usepackage{hyperref} 
 \usepackage{subcaption} % For subfigure environment
 
 
 \usepackage{personal}
+\usepackage[numbers]{natbib}
+\bibliographystyle{plainnat}
 \usepackage{wrapfig}
 \usepackage{graphicx}
-\usepackage{subcaption}
 \usepackage{listings}
 \usepackage{parskip}
 %\lstset{numbers=left, frame=tblr, basicstyle=\tiny, tabsize=3}
@@ -94,19 +94,19 @@ This setup allows flexible control over the number of measurements $ N $, signal
 
 \section{Choice of Algorithm}
 
-In the early phase of this project, a central task was to select a suitable inference algorithm for sparse signal recovery. The field of \emph{Approximate Message Passing} (AMP) algorithms has seen considerable research activity in recent years, offering powerful and efficient solutions for compressive sensing problems. A concise yet comprehensive overview is provided in the tutorial by Zou and Yang~\cite{zou2022concise}, which summarizes key variants and their respective strengths.
+In the early phase of this project, a central task was to select a suitable inference algorithm for sparse signal recovery. The field of \emph{Approximate Message Passing} (AMP) algorithms has seen considerable research activity in recent years, offering powerful and efficient solutions for compressive sensing problems. A concise yet comprehensive overview is provided in the tutorial by \citet{zou2022concise}, which summarizes key variants and their respective strengths.
 
 
 
-However, AMP methods rely heavily on assumptions about the structure of the measurement matrix. As noted by Zou and Yang~\cite{zou2022concise}, AMP algorithms often fail to converge when the measurement matrix deviates from the independent and identically distributed (i.i.d.) sub-Gaussian regime. To address this limitation, modified approaches such as Orthogonal AMP (OAMP) have been proposed~\cite{zou2022concise}, extending AMP's applicability to certain classes of unitarily-invariant matrices.
+However, AMP methods rely heavily on assumptions about the structure of the measurement matrix. As noted by \citet{zou2022concise}, AMP algorithms often fail to converge when the measurement matrix deviates from the independent and identically distributed (i.i.d.) sub-Gaussian regime. To address this limitation, modified approaches such as Orthogonal AMP (OAMP) have been proposed \citet{zou2022concise}, extending AMP's applicability to certain classes of unitarily-invariant matrices.
 
 In the context of this project, the eventual goal is to apply compressive sensing to near-field to far-field antenna pattern extrapolation. The underlying sparse representation may involve FFT bases or modal decompositions of the near-field, which are expected to yield structured, non-random measurement matrices. To maintain flexibility in handling such structure, methods constrained to i.i.d. random matrices—such as classical AMP—appear less suitable.
 
-As a result, I chose to explore an alternative inference approach based on the Expectation Maximization (EM) algorithm, as introduced by Wipf and Rao~\cite{wipf2004sparse} first. The EM-based SBL framework is known for its robustness and generality, making fewer assumptions about the measurement matrix. While it may not offer the same computational efficiency as AMP in ideal settings, it provides a more versatile and stable foundation for the anticipated applications of this project.
+As a result, I chose to explore an alternative inference approach based on the Expectation Maximization (EM) algorithm, as introduced by \citet{wipf2004sparse} first. The EM-based SBL framework is known for its robustness and generality, making fewer assumptions about the measurement matrix. While it may not offer the same computational efficiency as AMP in ideal settings, it provides a more versatile and stable foundation for the anticipated applications of this project.
 
 \section{EM-Based Sparse Bayesian Learning}
 
-To estimate sparse weights from an overcomplete basis, the Expectation-Maximization (EM) algorithm proposed in~\cite{wipf2004sparse} was implemented. This method belongs to the broader Sparse Bayesian Learning (SBL) framework, where sparsity is induced not by fixed priors, but through evidence maximization over a parameterized Gaussian prior.
+To estimate sparse weights from an overcomplete basis, the Expectation-Maximization (EM) algorithm proposed in \citet{wipf2004sparse} was implemented. This method belongs to the broader Sparse Bayesian Learning (SBL) framework, where sparsity is induced not by fixed priors, but through evidence maximization over a parameterized Gaussian prior.
 
 \subsection{Model Overview}
 
@@ -145,7 +145,7 @@ In my implementation, the update of $\sigma^2$ was simplified or deferred for st
 
 \subsection{Implementation Remarks}
 
-The algorithm was implemented in Python based directly on the formulation in~\cite{wipf2004sparse}. A simplified version of the EM loop is shown below:
+The algorithm was implemented in Python based directly on the formulation in \citet{wipf2004sparse}. A simplified version of the EM loop is shown below:
 
 \begin{verbatim}
 mu, Sigma = estimate_posterior()
@@ -154,11 +154,11 @@ gamma = mu**2 + np.diag(Sigma)
 
 The evolution of weights was tracked during training for diagnostic purposes, and convergence is monitored using the maximum change in $\mu$ and the relative mean squared error with respect to $\mathbf{t}$.
 
-The main practical limitation of this approach lies in the need to invert a $D \times D$ matrix at every iteration to compute $\Sigma_w$, making it computationally expensive for high-dimensional problems. This is noted in the original paper as well~\cite[p.~2155]{wipf2004sparse}, and future work may include reformulating the algorithm to reduce this complexity using the Woodbury identity or low-rank approximations.
+The main practical limitation of this approach lies in the need to invert a $D \times D$ matrix at every iteration to compute $\Sigma_w$, making it computationally expensive for high-dimensional problems. This is noted in the original paper as well \cite[p.~2155]{wipf2004sparse}, and future work may include reformulating the algorithm to reduce this complexity using the Woodbury identity or low-rank approximations.
 
 \subsection{Scalability via Covariance-Free Expectation Maximization (CoFEM)}
 
-While the EM-based Sparse Bayesian Learning implementation performs well for small-scale problems, it becomes prohibitively slow as the problem size increases. This is due to the need to invert a dense $ D \times D $ matrix in each iteration to compute the posterior covariance. To address this computational bottleneck, the \emph{Covariance-Free EM (CoFEM)} algorithm as proposed by Lin et al.~\cite{lin2022covariance} was implemented.
+While the EM-based Sparse Bayesian Learning implementation performs well for small-scale problems, it becomes prohibitively slow as the problem size increases. This is due to the need to invert a dense $ D \times D $ matrix in each iteration to compute the posterior covariance. To address this computational bottleneck, the \emph{Covariance-Free EM (CoFEM)} algorithm as proposed by \citet{lin2022covariance} was implemented.
 
 CoFEM avoids explicitly computing or storing the posterior covariance matrix. Instead, it estimates the required posterior statistics—the mean vector $ \boldsymbol{\mu}_w $ and the diagonal elements of the covariance matrix $ \Sigma_{jj} $—by solving a set of linear systems involving the precision matrix. These estimates are obtained using Rademacher probe vectors and linear solvers such as conjugate gradient, allowing for significant computational and memory savings.
 
@@ -178,7 +178,7 @@ To assess the scalability, the runtime of the EM and CoFEM algorithm was measure
 \end{equation}
 Both algorithms required roughly the same numbers of iterations.
 
-As shown in Figure~\ref{fig:runtime_comparison}, the CoFEM implementation significantly reduces runtime compared to the standard EM approach, especially as the dimensionality increases.
+As shown in Figure \ref{fig:runtime_comparison}, the CoFEM implementation significantly reduces runtime compared to the standard EM approach, especially as the dimensionality increases.
 
 \begin{figure}[H]
     \centering
@@ -196,7 +196,7 @@ To compare the performance of different EM-based Sparse Bayesian Learning algori
 
 The signal dimension was fixed to $ D = 1024 $. For the sparsity analysis the undersampling factor was fixed at $ \delta = 0.25 $, corresponding to $ N = \lfloor \delta D \rfloor $ measurements. For the undersampling analysis, the sparsity level was fixed at $ \rho = 0.06 $. The measurement matrix was drawn from a standard Gaussian distribution. Additive Gaussian noise with standard deviation $ \sigma = 0.01 $ was added to the measurements. For each setting, the reported results represent the average over five random trials to account for variability due to random initialization and noise.
 
-As shown in Figure \ref{fig:accuracy_vs_sparsity} and Figure \ref{fig:accuracy_vs_undersampling}, all four algorithms exhibit remarkably similar performance across the full range of tested sparsity and undersampling settings. In particular, the CoFEM algorithm with unknown noise variance performs on par with the variants that assume knowledge of the noise level. This observation is consistent with the findings reported in \cite{lin2022covariance}, where CoFEM and EM methods were shown to yield nearly identical reconstruction accuracy under equivalent settings.
+As shown in Figure \ref{fig:accuracy_vs_sparsity} and Figure \ref{fig:accuracy_vs_undersampling}, all four algorithms exhibit remarkably similar performance across the full range of tested sparsity and undersampling settings. In particular, the CoFEM algorithm with unknown noise variance performs on par with the variants that assume knowledge of the noise level. This observation is consistent with the findings reported in \citet{lin2022covariance}, where CoFEM and EM methods were shown to yield nearly identical reconstruction accuracy under equivalent settings.
 
 \begin{figure}[H]
     \centering
@@ -248,7 +248,7 @@ Stein's Lemma provides a fundamental relationship between the expectation of a f
     \mathbb{E}[Zf(Z)] = \mathbb{E}[f'(Z)]
 \end{equation}
 
-The proof follows from integration by parts and leverages the property of the standard normal density $\phi(z)$, where $\phi'(z) = -z\phi(z)$ \cite{Tibshirani2015SteinS}. This result extends to $X \sim \mathcal{N}(\mu, \sigma^2)$ through standardization:
+The proof follows from integration by parts and leverages the property of the standard normal density $\phi(z)$, where $\phi'(z) = -z\phi(z)$ (\citet{Tibshirani2015SteinS}). This result extends to $X \sim \mathcal{N}(\mu, \sigma^2)$ through standardization:
 
 \begin{equation}
     \frac{1}{\sigma^2}\mathbb{E}[(X - \mu)f(X)] = \mathbb{E}[f'(X)]
@@ -260,7 +260,7 @@ For the multivariate case, let $\mathbf{X} \sim \mathcal{N}(\boldsymbol{\mu}, \s
     \frac{1}{\sigma^2}\mathbb{E}[(\mathbf{X} - \boldsymbol{\mu})f(\mathbf{X})] = \mathbb{E}[\nabla f(\mathbf{X})]
 \end{equation}
 
-This is proved by applying the univariate lemma component-wise and using Fubini's theorem under the almost differentiability condition \cite{Tibshirani2015SteinS}. The lemma enables covariance estimation without explicit knowledge of $\boldsymbol{\mu}$, replacing it with computable partial derivatives.
+This is proved by applying the univariate lemma component-wise and using Fubini's theorem under the almost differentiability condition \citet{Tibshirani2015SteinS}. The lemma enables covariance estimation without explicit knowledge of $\boldsymbol{\mu}$, replacing it with computable partial derivatives.
 
 \subsection{Stein's Unbiased Risk Estimate (SURE)}
 For a Gaussian model $\mathbf{y} \sim \mathcal{N}(\boldsymbol{\mu}, \sigma^2 \mathbf{I}_n)$ and estimator $\boldsymbol{\hat{\mu}}(\mathbf{y})$, the risk $R = \mathbb{E}\|\boldsymbol{\mu} - \boldsymbol{\hat{\mu}}\|_2^2$ can be decomposed as:
@@ -276,7 +276,7 @@ Using Stein's Lemma, the covariance term is replaced with partial derivatives wh
     \widehat{R} = -n\sigma^2 + \|\mathbf{y} - \boldsymbol{\hat{\mu}}\|_2^2 + 2\sigma^2 \sum_{i=1}^n \frac{\partial \hat{\mu}_i}{\partial y_i}(\mathbf{y})
 \end{equation}
 
-SURE provides an unbiased risk estimator ($\mathbb{E}[\widehat{R}] = R$) without requiring knowledge of $\boldsymbol{\mu}$ \cite{Tibshirani2015SteinS}. For estimators depending on tuning parameters $\lambda$, SURE enables model selection through:
+SURE provides an unbiased risk estimator ($\mathbb{E}[\widehat{R}] = R$) without requiring knowledge of $\boldsymbol{\mu}$ (\cite{Tibshirani2015SteinS}). For estimators depending on tuning parameters $\lambda$, SURE enables model selection through:
 
 \begin{equation}
 \hat{\lambda} = \underset{\lambda \in \Lambda}{\arg\min} \left( \|\mathbf{y} - \boldsymbol{\hat{\mu}}_\lambda\|_2^2 + 2\sigma^2 \sum_{i=1}^n \frac{\partial \hat{\mu}_{\lambda,i}}{\partial y_i}(\mathbf{y}) \right)
@@ -286,7 +286,7 @@ SURE provides an unbiased risk estimator ($\mathbb{E}[\widehat{R}] = R$) without
 This framework has become instrumental for risk estimation and hyperparameter optimization in high-dimensional statistics.
 
 \subsection{Algorithm Design for SBL with SURE}
-The implementation of Sparse Bayesian Learning (SBL) with Stein's Unbiased Risk Estimator (SURE) was planned based on the theoretical framework presented in \cite{slockSURE}. In this setting, we consider the linear model:
+The implementation of Sparse Bayesian Learning (SBL) with Stein's Unbiased Risk Estimator (SURE) was planned based on the theoretical framework presented in \citet{slockSURE}. In this setting, we consider the linear model:
 
 \begin{equation}
     \mathbf{y} = \mathbf{A}\mathbf{x} + \mathbf{v}, \quad \mathbf{v} \sim \mathcal{N}(\mathbf{v}; \mathbf{0}, \sigma^2 \mathbf{I}), \quad \mathbf{x} \sim \mathcal{N}(\mathbf{x}; \mathbf{0}, \mathbf{P}),
@@ -307,13 +307,13 @@ where $\mathbf{R} = \mathbf{A}\mathbf{P}\mathbf{A}^T + \sigma^2 \mathbf{I}$. Alt
 with $\mathbf{S} = \mathbf{A}^T\mathbf{A} + \sigma^2 \mathbf{P}^{-1}$. 
 
 \subsection{Connection to Tipping's Fast Marginal Likelihood Algorithm}
-The posterior expressions derived above align with the sparse Bayesian framework described in \cite{tipp2003fastsb}. By adopting the notation used in Tipping's paper, where $\mathbf{A} \rightarrow \boldsymbol{\Phi}$, $\mathbf{y} \rightarrow \mathbf{t}$, $\mathbf{x} \rightarrow \mathbf{w}$, and $\mathbf{P} \rightarrow \mathbf{A}^{-1}$, the posterior mean and covariance become:
+The posterior expressions derived above align with the sparse Bayesian framework described in \citet{tipp2003fastsb}. By adopting the notation used in Tipping's paper, where $\mathbf{A} \rightarrow \boldsymbol{\Phi}$, $\mathbf{y} \rightarrow \mathbf{t}$, $\mathbf{x} \rightarrow \mathbf{w}$, and $\mathbf{P} \rightarrow \mathbf{A}^{-1}$, the posterior mean and covariance become:
 
 \begin{equation}
     \boldsymbol{\mu} = \sigma^{-2}\boldsymbol{\Sigma}\boldsymbol{\Phi}^T\mathbf{t}, \quad \boldsymbol{\Sigma} = \left(\mathbf{A} + \sigma^{-2}\boldsymbol{\Phi}^T\boldsymbol{\Phi}\right)^{-1}.
 \end{equation}
 
-These expressions are identical to those derived in \cite{tipp2003fastsb} for the posterior distribution of the weights $\mathbf{w}$ in the sparse Bayesian learning framework. This equivalence confirms that the Fast Marginal Likelihood Maximisation algorithm proposed by Tipping can be directly applied to implement SBL with SURE in our setting.
+These expressions are identical to those derived in \citet{tipp2003fastsb} for the posterior distribution of the weights $\mathbf{w}$ in the sparse Bayesian learning framework. This equivalence confirms that the Fast Marginal Likelihood Maximisation algorithm proposed by Tipping can be directly applied to implement SBL with SURE in our setting.
 
 The algorithm proceeds as follows:
 \begin{enumerate}
@@ -323,7 +323,7 @@ The algorithm proceeds as follows:
     \item Iterate until convergence, ensuring that the hyperparameters and noise variance are optimized for minimal mean squared error (MSE) as guided by SURE.
 \end{enumerate}
 
-This approach leverages the efficiency of Tipping's algorithm while incorporating the risk estimation principles of SURE to optimize hyperparameters. The result is a computationally tractable implementation of SBL that maintains sparsity and generalizes well, as demonstrated in the experiments reported in \cite{tipp2003fastsb}.
+This approach leverages the efficiency of Tipping's algorithm while incorporating the risk estimation principles of SURE to optimize hyperparameters. The result is a computationally tractable implementation of SBL that maintains sparsity and generalizes well, as demonstrated in the experiments reported in \citet{tipp2003fastsb}.
 
 \subsection{Implementation of the Fast Marginal Likelihood Algorithm}
 
@@ -400,7 +400,7 @@ This efficient implementation enables the algorithm to handle high-dimensional p
 
 \section{Comparative Analysis of EM and SBL-SURE Methodologies}
 \subsection{Accuracy vs. Undersampling and Sparsity}
-To evaluate the performance of both the SBL-SURE framework and the EM algorithm, we replicated the experimental conditions outlined in Section~\ref{sec:PerfEMCoFEMGauss}. While EM and CoFEM exhibited nearly identical reconstruction accuracy in Gaussian measurement systems, the EM algorithm proved unstable for complex-valued (FFT-based) dictionaries, frequently failing to converge. Consequently, EM results for the complex case were excluded from this comparison. Notably, in the rare instances where EM did converge for complex systems, its reconstruction error aligned with its Gaussian performance, suggesting no inherent disadvantage in complex domains—only algorithmic instability.
+To evaluate the performance of both the SBL-SURE framework and the EM algorithm, we replicated the experimental conditions outlined in Section \ref{sec:PerfEMCoFEMGauss}. While EM and CoFEM exhibited nearly identical reconstruction accuracy in Gaussian measurement systems, the EM algorithm proved unstable for complex-valued (FFT-based) dictionaries, frequently failing to converge. Consequently, EM results for the complex case were excluded from this comparison. Notably, in the rare instances where EM did converge for complex systems, its reconstruction error aligned with its Gaussian performance, suggesting no inherent disadvantage in complex domains—only algorithmic instability.
 
 Tipping’s Fast Marginal Likelihood algorithm, however, demonstrated robust performance across both Gaussian and complex-valued systems. As shown in Figures \ref{fig:accuracy_vs_undersampling_EMSB} and \ref{fig:accuracy_vs_sparsity_EMSB}, its accuracy in Gaussian systems closely matched EM’s, with EM achieving marginal improvements (2–4\% NRMSE reduction or $\Delta\rho\approx 0.05$). Strikingly, in complex-valued systems, Tipping’s method outperformed its own Gaussian results—a paradoxical reversal of trends observed with EM. This suggests that the Fast Marginal Likelihood framework inherently adapts more effectively to structured dictionaries like Fourier bases, despite EM’s theoretical equivalence.
 \begin{figure}[H]
@@ -463,8 +463,50 @@ At higher noise levels ($\sigma=0.01$), Figures \ref{fig:weight001Gauss} and \re
     \label{fig:weight001FFT}
 \end{figure}
 
+\section{Spherical Near-Field Antenna Patterns}
+\citet{Hofmann2019minimum} showed that the near-field of an antenna can be characterized with a minimum number of measurements under the assumption of sparsity in the sperical harmonics domain. The approach is based on expressing the near-field \(\mathbf{E}(r,\theta,\phi)\) as a linear combination of spherical vector wave functions \(\mathbf{h}_{smn}^{(4)}\). The theoretical framework is described in detail in \citet{hansen1988spherical}. In the following sections the notation of Hansen will be used. The near-field is expressed as:
+\begin{equation}
+    \mathbf{E}(r,\theta,\phi) = \frac{k}{\sqrt{\eta}}\sum_{c=3}^4\sum_{s=1}^2 \sum_{n=1}^\infty \sum_{m=-n}^m Q_{smn}^{(c)} \mathbf{F}_{smn}^{(c)}(r,\theta,\phi).
+\end{equation}
+\(\mathbf{E}(r,\theta,\phi)\) will correspond to \(\mathbf{t}\) in the SBL framework. Analogously, the spherical vector wave functions \(\mathbf{F}_{smn}^{(c)}(r,\theta,\phi)\) will be denoted as \(\Phi\) and \(Q_{smn}^{(c)}\) as \(\mathbf{w}\).
 
-\bibliographystyle{ieeetr}   % Or another style: plain, abbrv, unsrt, etc.
-\bibliography{Compressive_Sensing_Report}    
+\(Q_{smn}^{(c)}\) are called the wave coefficients and are the unknowns to be estimated. \(\eta\) is the specific admittance and defined as \(\sqrt{\epsilon/\mu}\). \(c = 1\) and \(c = 2\) indicate standing waves, while \(c = 3\) represents an outward travelling wave, and \(c = 4\) an inward travelling wave. Since we regard only antennas in transmission mode in the abscence of refelction, only \(c=4\) will be regarded. \(s = 1\) denotes the m-function while \(s = 2\) gives the n-function. The spherical vector wave functions \(\mathbf{F}_{smn}^{(c)}(r,\theta,\phi)\) are defined as:
+\begin{equation}
+    \begin{split}
+        \mathbf{F}_{1mn}^{(c)}(r,\theta,\phi) = &\frac{1}{\sqrt{2 \pi}} \frac{1}{\sqrt{n(n+1)}} \left( -\frac{m}{|m|} \right)^m \\
+        &\Bigg\{ z_n^{(c)}(kr) \frac{i m \overline{P}_n^{|m|}(\cos \theta)}{\sin \theta} e^{i m \phi} \hat{\theta} \\
+        &- z_n^{(c)}(kr) \frac{\mathrm{d} \overline{P}_n^{|m|}(\cos \theta)}{\mathrm{d} \theta} e^{i m \phi} \hat{\phi} \Bigg\} \\
+        \mathbf{F}_{2mn}^{(c)}(r, \theta, \phi) = &\frac{1}{\sqrt{2\pi}} \frac{1}{\sqrt{n(n+1)}} \left( -\frac{m}{|m|} \right)^m \\
+        &\Bigg\{ \frac{n(n+1)}{kr} z_n^{(c)}(kr) \bar{P}_n^{|m|}(\cos \theta) e^{im\phi} \hat{r} \\
+        &+ \frac{1}{kr} \frac{d}{d(kr)} \left( kr z_n^{(c)}(kr) \right) \frac{d \bar{P}_n^{|m|}(\cos \theta)}{d\theta} e^{im\phi} \hat{\theta} \\
+        &+ \frac{1}{kr} \frac{d}{d(kr)} \left( kr z_n^{(c)}(kr) \right) \frac{im \bar{P}_n^{|m|}(\cos \theta)}{\sin \theta} e^{im\phi} \hat{\phi} \Bigg\}
+    \end{split}
+\end{equation}
+where \(\bar{P}_n^{|m|}(\cos \theta)\) is the normalized associated Legendre function:
+\begin{equation}
+    \bar{P}_n^m(\cos \theta) = \sqrt{\frac{2n+1}{2} \frac{(n-m)!}{(n+m)!}} P_n^m(\cos \theta)
+\end{equation}
+The derivation of the normalized associated Legendre function can be expressed as:
+\begin{equation}
+    \begin{split}
+        \frac{d \bar{P}_n^{|m|}(\cos \theta)}{d\theta} &= \frac{d \bar{P}_n^{|m|}(\cos \theta)}{d\cos \theta} \frac{d\cos \theta}{d\theta} \\
+        &= -\sin\theta \sqrt{\frac{2n+1}{2} \frac{(n-m)!}{(n+m)!}} \frac{dP_n^{|m|}(\cos \theta)}{d\cos \theta}
+    \end{split}
+\end{equation}
+The radial function \(z_n^{(c)}(kr)\) depend on the wave type \(c\) and are defined as:
+\begin{equation}
+    z_n^{(c)}(kr) = \begin{cases}
+        j_n(kr) & , c = 1 \\
+        n_n(kr) & , c = 2 \\
+        h_n^{(1)}(kr) = j_n(kr) + i n_n(kr) & , c = 3 \\
+        h_n^{(2)}(kr) = j_n(kr) - i n_n(kr) & , c = 4
+    \end{cases}
+\end{equation}
+\subsection{Implementation}
+In the SBL framework, the spherical harmonics domain is embedded by representing the measured electromagnetic field as a linear combination of spherical vector wave functions, which serve as the basis functions. The measurement matrix $\Phi$ (or $F$ in the code) has dimensions $(N, D, 3)$, where $N$ is the number of spatial sampling points (each corresponding to a unique pair of angles $(\theta, \phi)$), $D$ is the total number of spherical harmonics modes (indexed by $(n, m, s)$), and the third dimension corresponds to the three Spherical field components (e.g., $E_r$, $E_\theta$, $E_\phi$). The measurement vector $\mathbf{t}$ is initially a matrix of shape $(N, 3)$, containing the three field components at each spatial point. To apply the SBL algorithm, which requires a standard linear model with scalar-valued entries, both $\Phi$ and $\mathbf{t}$ are reshaped: $\Phi$ is transformed to a matrix of shape $(3N, D)$ by stacking the field components for all points, and $\mathbf{t}$ is flattened to a vector of length $3N$. This allows the vector-valued measurement problem to be cast as a standard SBL problem, where the physical structure of the spherical harmonics expansion is preserved in the dictionary and the mapping between physical and matrix dimensions is explicit.
+
+
+
+\bibliography{Compressive_Sensing_Report}
 
 \end{document}

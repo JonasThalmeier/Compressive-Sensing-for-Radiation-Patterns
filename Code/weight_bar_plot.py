@@ -19,10 +19,15 @@ if __name__ == "__main__":
     D = 2*N_modes**2+4*N_modes  # Length of frequency-domain signal (D > N)
     L = 3
     rho = 0.1  # Sparsity factor
-    sigma = 1e-8  # Standard deviation of noise
+    sigma = 1e-1  # Standard deviation of noise
     threshold = 1e-8  # Convergence threshold
     max_iter = 200
-    t, Phi, w_true, e,_,_ = generate_spherical_wave(Phi_steps=36, Theta_steps=18, N_modes=N_modes, seed=seed, sigma=sigma)
+    eta = 376.7
+    f = 3e9
+    lamb = 3e8 / f
+    k = 2 * np.pi / lamb
+    r= 0.4
+    t, Phi, w_true, e,_,_ = generate_spherical_wave(R=r, Phi_steps=36, Theta_steps=18, N_modes=N_modes, seed=seed, sigma=sigma, k=k)
     print(f"t.shape: {t.shape}, Phi.shape: {Phi.shape}, w_true.shape: {w_true.shape}, e.shape: {e.shape}")
     # Run both algorithms for comparison
     print("Any NaN in Phi: " + str(np.any(np.isnan(Phi))))
