@@ -13,7 +13,7 @@ from utils.synthetic_spherical_wave import generate_spherical_wave
 # Generate data with finer grid for better visualization
 Theta_steps, Phi_steps = 45, 90
 N_modes = 5
-t, F, w, e = generate_spherical_wave(
+t, F, w, e,_,_ = generate_spherical_wave(
     Theta_steps=Theta_steps,
     Phi_steps=Phi_steps,
     N_modes=N_modes,
@@ -33,7 +33,7 @@ Z = np.cos(THETA)
 
 # Select a specific mode (e.g., first mode)
 n = 1
-m = -1
+m = 0
 s = 2
 mode_idx = n**2+n-1+m+(s-1)*N_modes*(N_modes+2)  # Choose a specific index in the range [0, D-1]
 w_single = np.zeros(F.shape[1])
@@ -53,10 +53,11 @@ fig = plt.figure(figsize=(15, 10))
 # Plot r component
 ax1 = fig.add_subplot(221, projection='3d')
 scale_factor = 1  # Adjust this to control the size of distortions
+add_factor = 0
 field_r = np.abs(field[:,:,0])
-X_r = X * (1 + scale_factor * field_r/np.max(field_r))
-Y_r = Y * (1 + scale_factor * field_r/np.max(field_r))
-Z_r = Z * (1 + scale_factor * field_r/np.max(field_r))
+X_r = X * (add_factor + scale_factor * field_r/np.max(field_r))
+Y_r = Y * (add_factor + scale_factor * field_r/np.max(field_r))
+Z_r = Z * (add_factor + scale_factor * field_r/np.max(field_r))
 p1 = ax1.plot_surface(X_r, Y_r, Z_r, facecolors=plt.cm.viridis(field_r/np.max(field_r)))
 ax1.set_title('Radial Component')
 fig.colorbar(p1, ax=ax1)
@@ -64,9 +65,9 @@ fig.colorbar(p1, ax=ax1)
 # Plot theta component
 ax2 = fig.add_subplot(222, projection='3d')
 field_theta = np.abs(field[:,:,1])
-X_theta = X * (1 + scale_factor * field_theta/np.max(field_theta))
-Y_theta = Y * (1 + scale_factor * field_theta/np.max(field_theta))
-Z_theta = Z * (1 + scale_factor * field_theta/np.max(field_theta))
+X_theta = X * (add_factor + scale_factor * field_theta/np.max(field_theta))
+Y_theta = Y * (add_factor + scale_factor * field_theta/np.max(field_theta))
+Z_theta = Z * (add_factor + scale_factor * field_theta/np.max(field_theta))
 p2 = ax2.plot_surface(X_theta, Y_theta, Z_theta, facecolors=plt.cm.viridis(field_theta/np.max(field_theta)))
 ax2.set_title('Theta Component')
 fig.colorbar(p2, ax=ax2)
@@ -74,9 +75,9 @@ fig.colorbar(p2, ax=ax2)
 # Plot phi component
 ax3 = fig.add_subplot(223, projection='3d')
 field_phi = np.abs(field[:,:,2])
-X_phi = X * (1 + scale_factor * field_phi/np.max(field_phi))
-Y_phi = Y * (1 + scale_factor * field_phi/np.max(field_phi))
-Z_phi = Z * (1 + scale_factor * field_phi/np.max(field_phi))
+X_phi = X * (add_factor + scale_factor * field_phi/np.max(field_phi))
+Y_phi = Y * (add_factor + scale_factor * field_phi/np.max(field_phi))
+Z_phi = Z * (add_factor + scale_factor * field_phi/np.max(field_phi))
 p3 = ax3.plot_surface(X_phi, Y_phi, Z_phi, facecolors=plt.cm.viridis(field_phi/np.max(field_phi)))
 ax3.set_title('Phi Component')
 fig.colorbar(p3, ax=ax3)
@@ -84,9 +85,9 @@ fig.colorbar(p3, ax=ax3)
 # Plot magnitude of total field
 ax4 = fig.add_subplot(224, projection='3d')
 total_field = np.sqrt(np.sum(np.abs(field)**2, axis=2))
-X_total = X * (1 + scale_factor * total_field/np.max(total_field))
-Y_total = Y * (1 + scale_factor * total_field/np.max(total_field))
-Z_total = Z * (1 + scale_factor * total_field/np.max(total_field))
+X_total = X * (add_factor + scale_factor * total_field/np.max(total_field))
+Y_total = Y * (add_factor + scale_factor * total_field/np.max(total_field))
+Z_total = Z * (add_factor + scale_factor * total_field/np.max(total_field))
 p4 = ax4.plot_surface(X_total, Y_total, Z_total, facecolors=plt.cm.viridis(total_field/np.max(total_field)))
 ax4.set_title('Total Field Magnitude')
 fig.colorbar(p4, ax=ax4)
