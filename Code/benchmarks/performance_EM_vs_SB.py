@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from utils.synthetic_data import generate_synthetic_data
-from EM_algs.EM_wo_SURE import SBL_EM
-from EM_algs.SBL_Fast import SBL_Fast
+from SBL_algs.EM_wo_SURE import SBL_EM
+from SBL_algs.SBL_Fast import SBL_Fast
 from utils.plot_settings import get_figsize, LINE_STYLES, DPI
 import os
 
