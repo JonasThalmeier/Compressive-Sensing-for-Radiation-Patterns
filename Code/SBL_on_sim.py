@@ -18,15 +18,15 @@ if __name__ == "__main__":
     # _,_ = Fmnc(2, 5, 3, 5, 0, 6.26573, k)
 
     filename = 'dipole_nearfield_spherical.txt'
-    Efield = load_nearfield(filename, undersampling=2)
+    Efield = load_nearfield(filename, undersampling=10)
     
     Efield_vec = transform_nearfield_to_vector(Efield)
-    F, nms_idx,_ = F_matrix_alt(Efield.theta, Efield.phi, R=r, N_modes=20, k=k)
+    F, nms_idx,_ = F_matrix_alt(Efield.theta, Efield.phi, R=r, N_modes=15, k=k)
     sbl_vec = SBL_Fast_Vector(Efield_vec, F, max_iter=100, threshold=1e-8)
     w_est, basis = sbl_vec.fit()
     print(f"Active basis (n,m,s): {nms_idx[basis,:]}")
-    Efield_full = load_nearfield(filename)
-    coeffs = calculate_spherical_coefficients(Efield_full, 20, k, r, c=3)
+    Efield_full = load_nearfield(filename, undersampling=10)
+    coeffs = calculate_spherical_coefficients(Efield_full, 15, k, r, c=3)
     weights = np.concatenate([nms_idx, w_est.reshape(-1,1)], axis=1).transpose()
     plot_coefficient_magnitudes(coeffs, weights)
 

@@ -172,25 +172,3 @@ def transform_vector_to_nearfield(E_vector, theta, phi):
     Efield_out.Mag_Etheta = np.abs(Etheta)
     Efield_out.Mag_Ephi = np.abs(Ephi)
     return Efield_out
-
-# Example usage
-if __name__ == "__main__":
-    import os
-    data_file = os.path.join(os.path.dirname(__file__), 'dipol1.txt')  # Robust path    
-    target_r = 25.0  # Target radius in mm
-    
-    try:
-        theta, phi, Er, Etheta, Ephi = get_field_at_radius(data_file, target_r, method='nearest')
-        output_dir = os.path.dirname(data_file)
-        output_file = os.path.join(output_dir, f'fields_r_{target_r:.1f}mm.npz')
-        np.savez(output_file, theta=theta, phi=phi, Er=Er, Etheta=Etheta, Ephi=Ephi)
-        theta_idx = np.argmin(np.abs(theta - np.pi/2))
-        phi_idx = np.argmin(np.abs(phi - 0))
-        
-        print(f"Field at r={target_r} mm, theta={theta[theta_idx]:.2f}, phi={phi[phi_idx]:.2f}:")
-        print(f"Er: {Er[theta_idx, phi_idx]} V/m")
-        print(f"Etheta: {Etheta[theta_idx, phi_idx]} V/m")
-        print(f"Ephi: {Ephi[theta_idx, phi_idx]} V/m")
-        
-    except ValueError as e:
-        print(e)

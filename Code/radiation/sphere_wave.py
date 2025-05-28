@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy as sp
+from collections import namedtuple
+
 
 
 def barPnm(n, m, x):
@@ -19,16 +21,35 @@ def dbarPnmcosTheta_dTheta(n, m, Theta):
     Returns:
         float: Derivative value
     """
+    normalization = np.sqrt((2*n+1)*(np.math.factorial(n-m)/(2*np.math.factorial(n+m))))
+    return normalization * dPnmcosTheta_dTheta(n, m, Theta)
+
+def dPnmcosTheta_dTheta(n, m, Theta):
+    """
+    Calculate the derivative of the associated Legendre function
+    with respect to theta.
+    
+    Parameters:
+        n (int): Degree
+        m (int): Order
+        Theta (float): Polar angle in radians
+    
+    Returns:
+        float: Derivative value
+    """
     eps = 1e-10  # Small value to prevent division by zero
     cos_theta = np.cos(Theta)
     sin_theta = np.sin(Theta)
     
     # Handle edge cases at poles (Theta = 0 or π)
     if np.abs(sin_theta) < eps:
-        return 0.0
+        return 0
+        # if m == 1 and n >= 1:
+        #     return -0.5 * n * (n+1)  # Example correction for m=1 case
+        # # Add other special cases as needed for your application
     
     # Safe division for the derivative
-    denominator = cos_theta**2 - 1
+    denominator = cos_theta**2-1
     denominator = np.where(np.abs(denominator) < eps, np.sign(denominator)*eps, denominator)
     
     Pnm_derivate = (1/denominator) * (
@@ -36,9 +57,7 @@ def dbarPnmcosTheta_dTheta(n, m, Theta):
         (n-m+1)*sp.special.lpmv(m, n+1, cos_theta)
     )
     
-    normalization = np.sqrt((2*n+1)*(np.math.factorial(n-m)/(2*np.math.factorial(n+m))))
-    return -normalization * Pnm_derivate * sin_theta
-
+    return  -Pnm_derivate * sin_theta
 
 def Fmnc(m, n, c, r, Theta, Phi, k):
     """
@@ -82,7 +101,7 @@ def Fmnc(m, n, c, r, Theta, Phi, k):
         z = sp.special.spherical_jn(n, k*r) - 1j*sp.special.spherical_yn(n, k*r)
         z_prime = sp.special.spherical_jn(n, k*r, derivative=True) - 1j*sp.special.spherical_yn(n, k*r, derivative=True)
     sinTheta = np.sin(Theta)
-    if sinTheta == 0:
+    if sinTheta <= 1e-3:
         sinTheta = 1e-3
     Theta1 = z * 1j * m * barPnm_val * np.exp(1j*m*Phi) / sinTheta
     Phi1 = -z * dbarPnm_val * np.exp(1j*m*Phi)
@@ -93,6 +112,159 @@ def Fmnc(m, n, c, r, Theta, Phi, k):
         print(f"NaN detected in Fmnc for m={m}, n={n}, c={c}, r={r}, Theta={Theta}, Phi={Phi}")
         print(f"Values: {Theta1}, {Phi1}, {r2}, {Theta2}, {Phi2}")
     return factor*np.array([0,Theta1,Phi1]), factor*np.array([r2,Theta2,Phi2])
+
+def nm_eo(m, n, r, Theta, Phi, k):
+    z = sp.special.spherical_jn(n, k*r) + 1j*sp.special.spherical_yn(n, k*r)
+    z_prime = sp.special.spherical_jn(n, k*r, derivative=True) + 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+    P = sp.special.lpmv(m, n, np.cos(Theta))
+    dP = dPnmcosTheta_dTheta(n, m, Theta)
+    sinTheta = np.sin(Theta)
+    if sinTheta <= 1e-3:
+        sinTheta = 1e-3
+    sinmPhi = np.sin(m*Phi)
+    cosmPhi = np.cos(m*Phi)
+    me = np.array([0,-z*m*P*sinmPhi/sinTheta, -z*dP*cosmPhi])
+    mo = np.array([0,z*m*P*cosmPhi/sinTheta, -z*dP*sinmPhi])
+    ne = np.array([n*(n+1)*z*P*sinmPhi/(k*r), (z+k*r*z_prime)*dP*sinmPhi, (z+k*r*z_prime)*m*P*cosmPhi/(k*r*sinTheta)]) 
+    no = np.array([n*(n+1)*z*P*cosmPhi/(k*r), (z+k*r*z_prime)*dP*cosmPhi, -(z+k*r*z_prime)*m*P*sinmPhi/(k*r*sinTheta)])
+    return me,mo,ne,no
+
+def nm_expansion(Efield, max_n, k, r, c=3):
+    """
+    Calculate spherical harmonics coefficients for E-field components.
+    
+    Args:
+        E_real: Tuple of (Er_real, Eth_real, Ephi_real) matrices
+        E_imag: Tuple of (Er_imag, Eth_imag, Ephi_imag) matrices
+        theta: 1D array of theta values
+        phi: 1D array of phi values
+        max_n: Maximum n value for harmonic expansion
+    
+    Returns:
+        Dictionary of complex coefficients {(s, m, n): coefficient}
+    """
+    # Convert E-field to complex representation
+    Er = Efield.Re_Er + 1j*Efield.Im_Er
+    Eth = Efield.Re_Etheta + 1j*Efield.Im_Etheta
+    Ephi = Efield.Re_Ephi + 1j*Efield.Im_Ephi
+    theta = Efield.theta
+    phi = Efield.phi
+
+    # Calculate differential elements
+    dtheta = np.abs(theta[1] - theta[0])
+    dphi = np.abs(phi[1] - phi[0])
+    
+    coefficients_ae = []
+    coefficients_ao = []
+    coefficients_be = []
+    coefficients_bo = []
+    
+    # Loop through all possible modes
+    for n in range(1, max_n+1):
+        for m in range(-n, n+1):
+            integralae = 0j
+            integralao = 0j
+            integralbe = 0j
+            integralbo = 0j
+            
+            # Perform surface integration
+            for i, th in enumerate(theta):
+                for j, ph in enumerate(phi):
+                    # Get vector spherical harmonic
+                    me,mo,ne,no = nm_eo(m, n, r, th, ph, k)
+                    # Dot product with E-field conjugate
+                    dot_product_ae = (Eth[i,j]*me[1] + 
+                                    Ephi[i,j]*me[2])
+                    dot_product_ao =  (Eth[i,j]*mo[1] + 
+                                    Ephi[i,j]*mo[2])
+                    # dot_product_be =  (Er[i,j]*ne[0]+
+                    #                    Eth[i,j]*ne[1] + 
+                    #                 Ephi[i,j]*ne[2])
+                    # dot_product_bo =  (Er[i,j]*no[0]+
+                    #                    Eth[i,j]*no[1] + 
+                    #                 Ephi[i,j]*no[2])
+
+                    dot_product_be =  (Eth[i,j]*ne[1] + 
+                                    Ephi[i,j]*ne[2])
+                    dot_product_bo =  (Eth[i,j]*no[1] + 
+                                    Ephi[i,j]*no[2])
+                    
+                    # Jacobian factor for spherical coordinates
+                    integralae += -dot_product_ae * np.sin(th) * dtheta * dphi
+                    integralao += -dot_product_ao * np.sin(th) * dtheta * dphi
+                    integralbe += -dot_product_be * np.sin(th) * dtheta * dphi
+                    integralbo += -dot_product_bo * np.sin(th) * dtheta * dphi
+            
+            z = sp.special.spherical_jn(n, k*r) + 1j*sp.special.spherical_yn(n, k*r)
+            z_prime = sp.special.spherical_jn(n, k*r, derivative=True) + 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+            factora = (2*n+1)*np.math.factorial(n-m)/(z**2*2*np.pi*(n+1)*np.math.factorial(n+m))
+            factorb = (2*n+1)*np.math.factorial(n-m)/((z/(k*r)+z_prime)**2*2*np.pi*n*(n+1)*np.math.factorial(n+m))
+            coefficients_ae.append([factora*integralae])
+            coefficients_ao.append([factora*integralao])
+            coefficients_be.append([factorb*integralbe])
+            coefficients_bo.append([factorb*integralbo])
+    coefficients_ae = np.array([coefficients_ae])
+    coefficients_ao = np.array([coefficients_ao])
+    coefficients_be = np.array([coefficients_be])
+    coefficients_bo = np.array([coefficients_bo])
+    return np.concatenate([coefficients_ae.reshape(-1,1),coefficients_ao.reshape(-1,1),coefficients_be.reshape(-1,1),coefficients_bo.reshape(-1,1)], axis=0)
+
+def inverse_nm_expansion(coefficients, r, theta, phi, k):
+    """
+    Reconstruct E-field from spherical harmonics coefficients.
+    Args:
+        coefficients: Array of [n, m, ae, ao, be, bo] coefficients
+        r: Radial distance (scalar)
+        theta: 1D array of theta values
+        phi: 1D array of phi values
+        k: Wavenumber
+    Returns:
+        Tuple of (Er, Eth, Ephi) complex field components
+    """
+    # Initialize field arrays
+    Er = np.zeros((len(theta), len(phi)), dtype=np.complex128)
+    Eth = np.zeros_like(Er)
+    Ephi = np.zeros_like(Er)
+    
+    # Process each coefficient set
+    for n, m, ae, ao, be, bo in coefficients:
+        # Calculate harmonics for all theta, phi points
+        n = int(n)
+        m = int(m)
+        for i, th in enumerate(theta):
+            for j, ph in enumerate(phi):
+                me, mo, ne, no = nm_eo(m, n, r, th, ph, k)
+                Er[i,j] += ae*me[0] + ao*mo[0] + be*ne[0] + bo*no[0]
+                Eth[i,j] += ae*me[1] + ao*mo[1] + be*ne[1] + bo*no[1]
+                Ephi[i,j] += ae*me[2] + ao*mo[2] + be*ne[2] + bo*no[2]
+    
+    # Calculate all required components
+    Re_Er = np.real(-Er)
+    Re_Etheta = np.real(-Eth)
+    Re_Ephi = np.real(-Ephi)
+    Im_Er = np.imag(-Er)
+    Im_Etheta = np.imag(-Eth)
+    Im_Ephi = np.imag(-Ephi)
+    Mag_Er = np.abs(Er)
+    Mag_Etheta = np.abs(Eth)
+    Mag_Ephi = np.abs(Ephi)
+
+    Efield = namedtuple('Efield', ['theta', 'phi', 'Re_Er', 'Re_Etheta', 'Re_Ephi', 
+                              'Im_Er', 'Im_Etheta', 'Im_Ephi',
+                              'Mag_Er', 'Mag_Etheta', 'Mag_Ephi'])
+    return Efield(
+        theta=theta,
+        phi=phi,
+        Re_Er=Re_Er,
+        Re_Etheta=Re_Etheta,
+        Re_Ephi=Re_Ephi,
+        Im_Er=Im_Er,
+        Im_Etheta=Im_Etheta,
+        Im_Ephi=Im_Ephi,
+        Mag_Er=Mag_Er,
+        Mag_Etheta=Mag_Etheta,
+        Mag_Ephi=Mag_Ephi
+    )
 
 def F_matrix(R=1, Theta_steps=18, Phi_steps=36, N_modes=50, c = 3, k=1):
     N = Theta_steps * Phi_steps
@@ -139,7 +311,34 @@ def F_matrix_alt(theta, phi, R=1, N_modes=50, c=3, k=1):
     
     return F, nms_idx, ThetaPhi_idx
 
-def calculate_spherical_coefficients(Efield, max_n, k, r, c=3):
+def abF_matrix_alt(theta, phi, R=1, N_modes=50, k=1):
+    """Build spherical wave coefficient matrix for given theta/phi arrays"""
+    N = len(theta) * len(phi)
+    D = (N_modes**2 + 2*N_modes)
+    Phi_steps = len(phi)
+    Fme = np.zeros((N, D, 3), dtype=np.complex_)
+    Fmo = np.zeros((N, D, 3), dtype=np.complex_)
+    Fne = np.zeros((N, D, 3), dtype=np.complex_)
+    Fno = np.zeros((N, D, 3), dtype=np.complex_)    
+    nms_idx = np.zeros((D, 2))
+    ThetaPhi_idx = np.zeros((N, 2))
+    for Theta_idx, Theta in enumerate(theta):
+        for Phi_idx, Phi in enumerate(phi):
+            ThetaPhi_idx[int(Theta_idx*Phi_steps + Phi_idx), :] = [Theta, Phi]
+            for n in range(1, N_modes+1):
+                for m in range(-n, n+1):
+                    idx = (int(Theta_idx*Phi_steps + Phi_idx), n**2 + n - 1 + m)
+                    Fme[idx[0], idx[1], :],Fmo[idx[0], idx[1], :],Fne[idx[0], idx[1], :],Fno[idx[0], idx[1], :] = nm_eo(m, n, R, Theta, Phi, k)
+    for n in range(1, N_modes+1):
+        for m in range(-n, n+1):
+            nms_idx[n**2 + n - 1 + m] = [n, m]
+    modes = np.concatenate([np.ones((D,1)),2*np.ones((D,1)),3*np.ones((D,1)),4*np.ones((D,1))], axis=0)
+    nms_idx = np.concatenate([nms_idx,nms_idx,nms_idx,nms_idx], axis=0)
+    nms_idx = np.concatenate([nms_idx,modes],axis=1)
+    F = np.concatenate([Fme,Fmo,Fne,Fno],axis=1)
+    return F, nms_idx, ThetaPhi_idx
+
+def F_expansion(Efield, max_n, k, r, c=3):
     """
     Calculate spherical harmonics coefficients for E-field components.
     
