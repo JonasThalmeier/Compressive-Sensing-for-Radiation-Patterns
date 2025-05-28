@@ -6,7 +6,8 @@
 \usepackage{graphicx}           % Optional, for figures
 \usepackage{hyperref} 
 \usepackage{subcaption} % For subfigure environment
-
+\usepackage{stackengine}
+\def\stacktype{L}
 
 \usepackage{personal}
 \usepackage[numbers]{natbib}
@@ -466,6 +467,7 @@ At higher noise levels ($\sigma=0.01$), Figures \ref{fig:weight001Gauss} and \re
 \section{Spherical Near-Field Antenna Patterns}
 \citet{Hofmann2019minimum} showed that the near-field of an antenna can be characterized with a minimum number of measurements under the assumption of sparsity in the sperical harmonics domain. The approach is based on expressing the near-field \(\mathbf{E}(r,\theta,\phi)\) as a linear combination of spherical vector wave functions \(\mathbf{h}_{smn}^{(4)}\). The theoretical framework is described in detail in \citet{hansen1988spherical}. In the following sections the notation of Hansen will be used. The near-field is expressed as:
 \begin{equation}
+    \label{eq:hansenEfield}
     \mathbf{E}(r,\theta,\phi) = \frac{k}{\sqrt{\eta}}\sum_{c=3}^4\sum_{s=1}^2 \sum_{n=1}^\infty \sum_{m=-n}^m Q_{smn}^{(c)} \mathbf{F}_{smn}^{(c)}(r,\theta,\phi).
 \end{equation}
 \(\mathbf{E}(r,\theta,\phi)\) will correspond to \(\mathbf{t}\) in the SBL framework. Analogously, the spherical vector wave functions \(\mathbf{F}_{smn}^{(c)}(r,\theta,\phi)\) will be denoted as \(\Phi\) and \(Q_{smn}^{(c)}\) as \(\mathbf{w}\).
@@ -474,12 +476,12 @@ At higher noise levels ($\sigma=0.01$), Figures \ref{fig:weight001Gauss} and \re
 \begin{equation}
     \begin{split}
         \mathbf{F}_{1mn}^{(c)}(r,\theta,\phi) = &\frac{1}{\sqrt{2 \pi}} \frac{1}{\sqrt{n(n+1)}} \left( -\frac{m}{|m|} \right)^m \\
-        &\Bigg\{ z_n^{(c)}(kr) \frac{i m \overline{P}_n^{|m|}(\cos \theta)}{\sin \theta} e^{i m \phi} \hat{\theta} \\
-        &- z_n^{(c)}(kr) \frac{\mathrm{d} \overline{P}_n^{|m|}(\cos \theta)}{\mathrm{d} \theta} e^{i m \phi} \hat{\phi} \Bigg\} \\
+        &\Bigg\{ z_n^{(c)}(kr) \frac{i m \overline{P}_n^{|m|}(\cos \theta)}{\sin \theta} e^{i m \phi} \boldsymbol{\hat{\theta}} \\
+        &- z_n^{(c)}(kr) \frac{\mathrm{d} \overline{P}_n^{|m|}(\cos \theta)}{\mathrm{d} \theta} e^{i m \phi} \boldsymbol{\hat{\phi}} \Bigg\} \\
         \mathbf{F}_{2mn}^{(c)}(r, \theta, \phi) = &\frac{1}{\sqrt{2\pi}} \frac{1}{\sqrt{n(n+1)}} \left( -\frac{m}{|m|} \right)^m \\
-        &\Bigg\{ \frac{n(n+1)}{kr} z_n^{(c)}(kr) \bar{P}_n^{|m|}(\cos \theta) e^{im\phi} \hat{r} \\
-        &+ \frac{1}{kr} \frac{d}{d(kr)} \left( kr z_n^{(c)}(kr) \right) \frac{d \bar{P}_n^{|m|}(\cos \theta)}{d\theta} e^{im\phi} \hat{\theta} \\
-        &+ \frac{1}{kr} \frac{d}{d(kr)} \left( kr z_n^{(c)}(kr) \right) \frac{im \bar{P}_n^{|m|}(\cos \theta)}{\sin \theta} e^{im\phi} \hat{\phi} \Bigg\}
+        &\Bigg\{ \frac{n(n+1)}{kr} z_n^{(c)}(kr) \bar{P}_n^{|m|}(\cos \theta) e^{im\phi} \boldsymbol{\hat{r}} \\
+        &+ \frac{1}{kr} \frac{d}{d(kr)} \left( kr z_n^{(c)}(kr) \right) \frac{d \bar{P}_n^{|m|}(\cos \theta)}{d\theta} e^{im\phi} \boldsymbol{\hat{\theta}} \\
+        &+ \frac{1}{kr} \frac{d}{d(kr)} \left( kr z_n^{(c)}(kr) \right) \frac{im \bar{P}_n^{|m|}(\cos \theta)}{\sin \theta} e^{im\phi} \boldsymbol{\hat{\phi}} \Bigg\}
     \end{split}
 \end{equation}
 where \(\bar{P}_n^{|m|}(\cos \theta)\) is the normalized associated Legendre function:
@@ -502,6 +504,31 @@ The radial function \(z_n^{(c)}(kr)\) depend on the wave type \(c\) and are defi
         h_n^{(2)}(kr) = j_n(kr) - i n_n(kr) & , c = 4
     \end{cases}
 \end{equation}
+\subsection{Classic Spherical-Wave Expansion}
+As a comparision and baseline for the later experiments with SBL in conjuction with spherical harmonics, code for "classic" spherical-wave expansion was implemented. Since neither \citet{hansen1988spherical} nor \citet{Hofmann2019minimum} provide a formulas to obtain the coefficients \(Q_{smn}^{(c)}\) from equation \ref{eq:hansenEfield} and the attempts to derive a formula by my own did not turn out to be successful, another notation had to be used. \citet{Ludwig1971NearfieldFT} presents how to derive the coefficients \(a_{e,o_{mn}}\) (TE waves) and \(b_{e,o_{mn}}\) (TM waves) in order to present the electric field like:
+\begin{equation}
+    \mathbf{E}(r,\theta,\phi)=-\sum_{m=-n}^n \sum_{n=1}^\infty a_{e,o_{mn}} \mathbf{m}_{e,o_{mn}} + b_{e,o_{mn}} \mathbf{n}_{e,o_{mn}}
+\end{equation}
+where the harmonic functions are defined as
+\begin{equation}
+    \begin{split}
+        \mathbf{m}_{e,o_{mn}} =& \mp z_n(kr) \frac{m P_n^m(\cos \theta)}{\sin \theta} \stackanchor{$\sin$}{$\cos$} m \phi \, \boldsymbol{\hat{\theta}} \\
+        &- z_n(kr) \frac{\partial}{\partial \theta} P_n^m(\cos \theta)\stackanchor{$\cos$}{$\sin$}m\phi \boldsymbol{\hat{\phi}}\\
+        \mathbf{n}_{e,o_{mn}} =& n(n+1) \frac{z_n(kr)}{kr} P_n^m(\cos \theta)\stackanchor{$\sin$}{$\cos$} m \phi \boldsymbol{\hat{r}} \\
+        &+ \frac{1}{kr} \frac{\partial}{\partial r} \left[ r z_n(kr) \right] \frac{\partial}{\partial \theta} P_n^m(\cos \theta)\stackanchor{$\sin$}{$\cos$} m \phi \boldsymbol{\hat{\theta}} \\
+        &\pm \frac{1}{k r} \frac{\partial}{\partial r} \left[r z_n(k r) \right] \frac{m P_n^m(\cos \theta)}{\sin \theta}\stackanchor{$\cos$}{$\sin$} m \phi \boldsymbol{\hat{\phi}}
+    \end{split}
+\end{equation} 
+In this case the Hankel function of second kind (\(j_n-iy_n)\) is used as \(z_n\), since only outward travelling waves are considered and the sources are assumed to have finite extend. The coefficients \(a_{e,o_{mn}}\) and \(b_{e,o_{mn}}\) an be obtained by solving the following integrals:
+\begin{equation}
+    \begin{split}
+        a_{e,0_{mn}} =& \frac{1}{\left[z_n(kr_1)\right]^2} \frac{2n+1}{\pi 2n (n+1)} \frac{(n-m)!}{(n+m)!} \\
+        &\cdot \int_0^{2\pi} \int_0^{\pi} -\mathbf{m}_{e,o_{mn}} \cdot \mathbf{E}(r_1, \theta, \phi)_{\tan} \sin \theta \, d\theta \, d\phi\\
+        b_{e,o_{mn}} = &\frac{1}{\left[(1/kr_1)(\partial/\partial r) [r_1 z_n(kr_1)]\right]^2} \frac{2n + 1}{\pi 2n (n+1)} \frac{(n - m)!}{(n + m)!}\\
+        &\cdot \int_0^{2\pi} \int_0^{\pi} -\mathbf{n}_{e,o_{mn}} \cdot \mathbf{E}(r_1, \theta, \phi)_{\tan} \sin \theta \, d\theta \, d\phi
+    \end{split}
+\end{equation}
+
 \subsection{Implementation}
 In the SBL framework, the spherical harmonics domain is embedded by representing the measured electromagnetic field as a linear combination of spherical vector wave functions, which serve as the basis functions. The measurement matrix $\Phi$ (or $F$ in the code) has dimensions $(N, D, 3)$, where $N$ is the number of spatial sampling points (each corresponding to a unique pair of angles $(\theta, \phi)$), $D$ is the total number of spherical harmonics modes (indexed by $(n, m, s)$), and the third dimension corresponds to the three Spherical field components (e.g., $E_r$, $E_\theta$, $E_\phi$). The measurement vector $\mathbf{t}$ is initially a matrix of shape $(N, 3)$, containing the three field components at each spatial point. To apply the SBL algorithm, which requires a standard linear model with scalar-valued entries, both $\Phi$ and $\mathbf{t}$ are reshaped: $\Phi$ is transformed to a matrix of shape $(3N, D)$ by stacking the field components for all points, and $\mathbf{t}$ is flattened to a vector of length $3N$. This allows the vector-valued measurement problem to be cast as a standard SBL problem, where the physical structure of the spherical harmonics expansion is preserved in the dictionary and the mapping between physical and matrix dimensions is explicit.
 

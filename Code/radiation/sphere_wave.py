@@ -59,6 +59,21 @@ def dPnmcosTheta_dTheta(n, m, Theta):
     
     return  -Pnm_derivate * sin_theta
 
+def z_n(n,k,r,c):
+    if c == 1:
+        z = sp.special.spherical_jn(n, k*r)
+        z_prime = sp.special.spherical_jn(n, k*r, derivative=True)
+    elif c == 2:
+        z = sp.special.spherical_yn(n, k*r)
+        z_prime = sp.special.spherical_yn(n, k*r, derivative=True)
+    elif c == 3:
+        z = sp.special.spherical_jn(n, k*r) + 1j*sp.special.spherical_yn(n, k*r)
+        z_prime = sp.special.spherical_jn(n, k*r, derivative=True) + 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+    else:
+        z = sp.special.spherical_jn(n, k*r) - 1j*sp.special.spherical_yn(n, k*r)
+        z_prime = sp.special.spherical_jn(n, k*r, derivative=True) - 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+    return z,z_prime
+
 def Fmnc(m, n, c, r, Theta, Phi, k):
     """
     Calculate the vector spherical wave functions F_mn^(c) for electromagnetic field expansion.
@@ -88,18 +103,7 @@ def Fmnc(m, n, c, r, Theta, Phi, k):
         factor *= (-m/np.abs(m))**m
     barPnm_val = barPnm(n, np.abs(m), np.cos(Theta))
     dbarPnm_val = dbarPnmcosTheta_dTheta(n, np.abs(m), Theta)
-    if c == 1:
-        z = sp.special.spherical_jn(n, k*r)
-        z_prime = sp.special.spherical_jn(n, k*r, derivative=True)
-    elif c == 2:
-        z = sp.special.spherical_yn(n, k*r)
-        z_prime = sp.special.spherical_yn(n, k*r, derivative=True)
-    elif c == 3:
-        z = sp.special.spherical_jn(n, k*r) + 1j*sp.special.spherical_yn(n, k*r)
-        z_prime = sp.special.spherical_jn(n, k*r, derivative=True) + 1j*sp.special.spherical_yn(n, k*r, derivative=True)
-    else:
-        z = sp.special.spherical_jn(n, k*r) - 1j*sp.special.spherical_yn(n, k*r)
-        z_prime = sp.special.spherical_jn(n, k*r, derivative=True) - 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+    z,z_prime = z_n(n,k,r,c)
     sinTheta = np.sin(Theta)
     if sinTheta <= 1e-3:
         sinTheta = 1e-3
@@ -113,9 +117,8 @@ def Fmnc(m, n, c, r, Theta, Phi, k):
         print(f"Values: {Theta1}, {Phi1}, {r2}, {Theta2}, {Phi2}")
     return factor*np.array([0,Theta1,Phi1]), factor*np.array([r2,Theta2,Phi2])
 
-def nm_eo(m, n, r, Theta, Phi, k):
-    z = sp.special.spherical_jn(n, k*r) + 1j*sp.special.spherical_yn(n, k*r)
-    z_prime = sp.special.spherical_jn(n, k*r, derivative=True) + 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+def nm_eo(m, n, r, Theta, Phi, k, c=3):
+    z,z_prime = z_n(n,k,r,c)
     P = sp.special.lpmv(m, n, np.cos(Theta))
     dP = dPnmcosTheta_dTheta(n, m, Theta)
     sinTheta = np.sin(Theta)
@@ -173,21 +176,21 @@ def nm_expansion(Efield, max_n, k, r, c=3):
                     # Get vector spherical harmonic
                     me,mo,ne,no = nm_eo(m, n, r, th, ph, k)
                     # Dot product with E-field conjugate
-                    dot_product_ae = (Eth[i,j]*me[1] + 
-                                    Ephi[i,j]*me[2])
-                    dot_product_ao =  (Eth[i,j]*mo[1] + 
-                                    Ephi[i,j]*mo[2])
-                    # dot_product_be =  (Er[i,j]*ne[0]+
-                    #                    Eth[i,j]*ne[1] + 
-                    #                 Ephi[i,j]*ne[2])
-                    # dot_product_bo =  (Er[i,j]*no[0]+
-                    #                    Eth[i,j]*no[1] + 
-                    #                 Ephi[i,j]*no[2])
+                    dot_product_ae = (Eth[i,j]*np.conj(me[1]) + 
+                                    Ephi[i,j]*np.conj(me[2]))
+                    dot_product_ao =  (Eth[i,j]*np.conj(mo[1]) + 
+                                    Ephi[i,j]*np.conj(mo[2]))
+                    dot_product_be =  (Er[i,j]*np.conj(ne[0])+
+                                       Eth[i,j]*np.conj(ne[1]) + 
+                                    Ephi[i,j]*np.conj(ne[2]))
+                    dot_product_bo =  (Er[i,j]*np.conj(no[0])+
+                                       Eth[i,j]*np.conj(no[1]) + 
+                                    Ephi[i,j]*np.conj(no[2]))
 
-                    dot_product_be =  (Eth[i,j]*ne[1] + 
-                                    Ephi[i,j]*ne[2])
-                    dot_product_bo =  (Eth[i,j]*no[1] + 
-                                    Ephi[i,j]*no[2])
+                    # dot_product_be =  (Eth[i,j]*ne[1] + 
+                    #                 Ephi[i,j]*ne[2])
+                    # dot_product_bo =  (Eth[i,j]*no[1] + 
+                    #                 Ephi[i,j]*no[2])
                     
                     # Jacobian factor for spherical coordinates
                     integralae += -dot_product_ae * np.sin(th) * dtheta * dphi
@@ -195,10 +198,10 @@ def nm_expansion(Efield, max_n, k, r, c=3):
                     integralbe += -dot_product_be * np.sin(th) * dtheta * dphi
                     integralbo += -dot_product_bo * np.sin(th) * dtheta * dphi
             
-            z = sp.special.spherical_jn(n, k*r) + 1j*sp.special.spherical_yn(n, k*r)
-            z_prime = sp.special.spherical_jn(n, k*r, derivative=True) + 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+            z,z_prime = z_n(n,k,r,c)
             factora = (2*n+1)*np.math.factorial(n-m)/(z**2*2*np.pi*(n+1)*np.math.factorial(n+m))
             factorb = (2*n+1)*np.math.factorial(n-m)/((z/(k*r)+z_prime)**2*2*np.pi*n*(n+1)*np.math.factorial(n+m))
+
             coefficients_ae.append([factora*integralae])
             coefficients_ao.append([factora*integralao])
             coefficients_be.append([factorb*integralbe])
@@ -363,34 +366,39 @@ def F_expansion(Efield, max_n, k, r, c=3):
     dtheta = np.abs(theta[1] - theta[0])
     dphi = np.abs(phi[1] - phi[0])
     
-    coefficients1 = []
-    coefficients2 = []
+    coefficients_F1 = []
+    coefficients_F2 = []
+
     
     # Loop through all possible modes
     for n in range(1, max_n+1):
         for m in range(-n, n+1):
-            integral1 = 0j
-            integral2 = 0j
+            integralF1 = 0j
+            integralF2 = 0j
             
             # Perform surface integration
             for i, th in enumerate(theta):
                 for j, ph in enumerate(phi):
                     # Get vector spherical harmonic
-                    F1,F2 = Fmnc(m, n, c, r, th, ph, k)
+                    F1,F2 = Fmnc(-m, n, c, r, th, ph, k)
                     # Dot product with E-field conjugate
-                    dot_product1 = (Er[i,j]*np.conj(F1[0]) + 
-                                    Eth[i,j]*np.conj(F1[1]) + 
-                                    Ephi[i,j]*np.conj(F1[2]))
-                    dot_product2 = (Er[i,j]*np.conj(F2[0]) + 
-                                    Eth[i,j]*np.conj(F2[1]) + 
-                                    Ephi[i,j]*np.conj(F2[2]))
-                    
+                    dot_product_F1 = (Eth[i,j]*F1[1] + 
+                                      Ephi[i,j]*F1[2])
+                                        #Er[i,j]*F1[0])
+                    dot_product_F2 =  (Eth[i,j]*F2[1] + 
+                                       Ephi[i,j]*F2[2])
+                                        #Er[i,j]*F2[0])
                     # Jacobian factor for spherical coordinates
-                    integral1 += dot_product1 * np.sin(th) * dtheta * dphi
-                    integral2 += dot_product2 * np.sin(th) * dtheta * dphi
+                    integralF1 += dot_product_F1 * np.sin(th) * dtheta * dphi
+                    integralF2 += dot_product_F2 * np.sin(th) * dtheta * dphi
             
+            z,z_prime = z_n(n,k,r,c)
+            factorF1 = 1/(z**2)
+            factorF2 = 1/(((1/r)*(z+k*r*z_prime))**2)
 
-            coefficients1.append([n,m,1,integral1])
-            coefficients2.append([n,m,2,integral2])
-                
-    return np.concatenate([coefficients1,coefficients2], axis=0).transpose()
+            coefficients_F1.append([factorF1*integralF1])
+            coefficients_F2.append([factorF2*integralF2])
+    coefficients_F1 = np.array([coefficients_F1])
+    coefficients_F2 = np.array([coefficients_F2])
+
+    return np.concatenate([coefficients_F1.reshape(-1,1),coefficients_F2.reshape(-1,1)], axis=0)
