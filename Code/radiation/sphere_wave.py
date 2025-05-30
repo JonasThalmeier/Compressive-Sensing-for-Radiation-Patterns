@@ -59,7 +59,7 @@ def dPnmcosTheta_dTheta(n, m, Theta):
     
     return  -Pnm_derivate * sin_theta
 
-def z_n(n,k,r,c):
+def z_n(n,k,r,c,NF=True):
     if c == 1:
         z = sp.special.spherical_jn(n, k*r)
         z_prime = sp.special.spherical_jn(n, k*r, derivative=True)
@@ -67,14 +67,30 @@ def z_n(n,k,r,c):
         z = sp.special.spherical_yn(n, k*r)
         z_prime = sp.special.spherical_yn(n, k*r, derivative=True)
     elif c == 3:
-        z = sp.special.spherical_jn(n, k*r) + 1j*sp.special.spherical_yn(n, k*r)
-        z_prime = sp.special.spherical_jn(n, k*r, derivative=True) + 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+        if NF:
+            z = sp.special.spherical_jn(n, k*r) + 1j*sp.special.spherical_yn(n, k*r)
+            z_prime = sp.special.spherical_jn(n, k*r, derivative=True) + 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+        else:
+            z = (-1j)**(n+1)*np.exp(1j*k*r)/(k*r)
     else:
-        z = sp.special.spherical_jn(n, k*r) - 1j*sp.special.spherical_yn(n, k*r)
-        z_prime = sp.special.spherical_jn(n, k*r, derivative=True) - 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+        if NF:
+            z = sp.special.spherical_jn(n, k*r) - 1j*sp.special.spherical_yn(n, k*r)
+            z_prime = sp.special.spherical_jn(n, k*r, derivative=True) - 1j*sp.special.spherical_yn(n, k*r, derivative=True)
+        else:
+            z = (1j)**(n+1)*np.exp(-1j*k*r)/(k*r)
     return z,z_prime
 
-def Fmnc(m, n, c, r, Theta, Phi, k):
+def krdzdkr(n,k,r,c,NF=True):
+    z,z_prime = z_n(n,k,r,c)
+    if NF:
+        return z+k*r*z_prime
+    else:
+        if c==3:
+            return (-1j)**n*np.exp(1j*k*r)/(k*r)
+        elif c==4:
+            return (1j)**n*np.exp(-1j*k*r)/(k*r)
+
+def Fmnc(m, n, c, r, Theta, Phi, k, NF):
     """
     Calculate the vector spherical wave functions F_mn^(c) for electromagnetic field expansion.
     
@@ -99,19 +115,21 @@ def Fmnc(m, n, c, r, Theta, Phi, k):
               (F_mn^(c)_1, F_mn^(c)_2), each with shape (3,) for (r,θ,φ) components
     """
     factor = 1/np.sqrt(2*np.pi*n*(n+1))
+    # factor = 1/np.sqrt(n*(n+1))
     if m != 0:
         factor *= (-m/np.abs(m))**m
     barPnm_val = barPnm(n, np.abs(m), np.cos(Theta))
     dbarPnm_val = dbarPnmcosTheta_dTheta(n, np.abs(m), Theta)
-    z,z_prime = z_n(n,k,r,c)
+    z,z_prime = z_n(n,k,r,c,NF=NF)
+    krdzdkr_val = krdzdkr(n,k,r,c,NF=True)
     sinTheta = np.sin(Theta)
     if sinTheta <= 1e-3:
         sinTheta = 1e-3
     Theta1 = z * 1j * m * barPnm_val * np.exp(1j*m*Phi) / sinTheta
     Phi1 = -z * dbarPnm_val * np.exp(1j*m*Phi)
-    r2 = (n*(n+1)/(k*r))*z*barPnm_val*np.exp(1j*m*Phi)
-    Theta2 = 1/(k*r) * (z + k*r*z_prime) * dbarPnm_val * np.exp(1j*m*Phi)
-    Phi2 = 1/(k*r) * (z + k*r*z_prime) * 1j * m * barPnm_val * np.exp(1j*m*Phi) / sinTheta
+    r2 = (n*(n+1)/(k*r))*z*barPnm_val*np.exp(1j*m*Phi) * NF # zero if FF
+    Theta2 = krdzdkr_val * dbarPnm_val * np.exp(1j*m*Phi)
+    Phi2 = krdzdkr_val * (z + k*r*z_prime) * 1j * m * barPnm_val * np.exp(1j*m*Phi) / sinTheta
     if np.any(np.isnan(np.array([Theta1, Phi1, r2, Theta2, Phi2]))):
         print(f"NaN detected in Fmnc for m={m}, n={n}, c={c}, r={r}, Theta={Theta}, Phi={Phi}")
         print(f"Values: {Theta1}, {Phi1}, {r2}, {Theta2}, {Phi2}")
@@ -291,7 +309,7 @@ def F_matrix(R=1, Theta_steps=18, Phi_steps=36, N_modes=50, c = 3, k=1):
     # F = F/(np.max(np.abs(F), axis=(0,2))[np.newaxis, :, np.newaxis])  # Normalize F to avoid numerical issues
     return F, nms_idx, ThetaPhi_idx
 
-def F_matrix_alt(theta, phi, R=1, N_modes=50, c=3, k=1):
+def F_matrix_alt(theta, phi, R=1, N_modes=50, c=3, k=1, NF=True):
     """Build spherical wave coefficient matrix for given theta/phi arrays"""
     N = len(theta) * len(phi)
     D = 2*N_modes**2 + 4*N_modes
@@ -306,7 +324,7 @@ def F_matrix_alt(theta, phi, R=1, N_modes=50, c=3, k=1):
                 for m in range(-n, n+1):
                     idx1 = (int(Theta_idx*Phi_steps + Phi_idx), n**2 + n - 1 + m)
                     idx2 = (int(Theta_idx*Phi_steps + Phi_idx), n**2 + n - 1 + m + D//2)
-                    F[idx1[0], idx1[1], :], F[idx2[0], idx2[1], :] = Fmnc(m, n, c, R, Theta, Phi, k)
+                    F[idx1[0], idx1[1], :], F[idx2[0], idx2[1], :] = Fmnc(m, n, c, R, Theta, Phi, k, NF)
     for n in range(1, N_modes+1):
         for m in range(-n, n+1):
             nms_idx[n**2 + n - 1 + m] = [n, m, 1]

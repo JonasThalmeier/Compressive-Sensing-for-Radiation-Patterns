@@ -245,3 +245,4 @@ def vec_MSE(vec_est,vec_true):
         norm_component = np.mean(np.abs(vec_true[:, i])**2)
         relative_mse_component = mse_component / norm_component
         print(f"Relative MSE ({component}): {relative_mse_component}")
+    return relative_mse
