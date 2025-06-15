@@ -465,7 +465,48 @@ At higher noise levels ($\sigma=0.01$), Figures \ref{fig:weight001Gauss} and \re
 \end{figure}
 
 \section{Spherical Near-Field Antenna Patterns}
-\citet{Hofmann2019minimum} showed that the near-field of an antenna can be characterized with a minimum number of measurements under the assumption of sparsity in the sperical harmonics domain. The approach is based on expressing the near-field \(\mathbf{E}(r,\theta,\phi)\) as a linear combination of spherical vector wave functions \(\mathbf{h}_{smn}^{(4)}\). The theoretical framework is described in detail in \citet{hansen1988spherical}. In the following sections the notation of Hansen will be used. The near-field is expressed as:
+\subsection{Spherical-Wave Expansion}
+
+Spherical wave expansion (SWE) provides a mathematical framework for analyzing electromagnetic fields, particularly those radiated by antennas. By decomposing the electric field \(\mathbf{E}(r, \theta, \phi)\) into a sum of orthogonal spherical wave functions \(\mathbf{m}_{e,o_{mn}}\) and \(\mathbf{n}_{e,o_{mn}}\), SWE enables a systematic representation of the field in terms of outward-traveling waves. The expansion coefficients \(a_{e,o_{mn}}\) and \(b_{e,o_{mn}}\) are determined by projecting the tangential components of the field onto these basis functions, as shown in the integral expressions. This approach is especially useful for antenna characterization, near-field to far-field transformations, and scattering analysis, as it captures the field's angular and radial dependencies in a compact and physically meaningful way. The use of Hankel functions of the second kind ensures that only outward-propagating waves are considered, making SWE well-suited for problems involving radiation from finite sources. \citet{Ludwig1971NearfieldFT} presents how to derive the coefficients \(a_{e,o_{mn}}\) (TE waves) and \(b_{e,o_{mn}}\) (TM waves) in order to present the electric field like:
+\begin{equation}
+    \mathbf{E}(r,\theta,\phi)=-\sum_{m=-n}^n \sum_{n=1}^\infty a_{e,o_{mn}} \mathbf{m}_{e,o_{mn}} + b_{e,o_{mn}} \mathbf{n}_{e,o_{mn}}
+\end{equation}
+where the harmonic functions are defined as
+\begin{equation}
+    \begin{split}
+        \mathbf{m}_{e,o_{mn}} =& \mp z_n(kr) \frac{m P_n^m(\cos \theta)}{\sin \theta} \stackanchor{$\sin$}{$\cos$} m \phi \, \boldsymbol{\hat{\theta}} \\
+        &- z_n(kr) \frac{\partial}{\partial \theta} P_n^m(\cos \theta)\stackanchor{$\cos$}{$\sin$}m\phi \boldsymbol{\hat{\phi}}\\
+        \mathbf{n}_{e,o_{mn}} =& n(n+1) \frac{z_n(kr)}{kr} P_n^m(\cos \theta)\stackanchor{$\sin$}{$\cos$} m \phi \boldsymbol{\hat{r}} \\
+        &+ \frac{1}{kr} \frac{\partial}{\partial r} \left[ r z_n(kr) \right] \frac{\partial}{\partial \theta} P_n^m(\cos \theta)\stackanchor{$\sin$}{$\cos$} m \phi \boldsymbol{\hat{\theta}} \\
+        &\pm \frac{1}{k r} \frac{\partial}{\partial r} \left[r z_n(k r) \right] \frac{m P_n^m(\cos \theta)}{\sin \theta}\stackanchor{$\cos$}{$\sin$} m \phi \boldsymbol{\hat{\phi}}
+    \end{split}
+\end{equation}
+where \(P_n^{|m|}(\cos \theta)\) is the associated Legendre function. The radial function \(z_n^{(c)}(kr)\) depend on the wave type \(c\) and are defined as:
+\begin{equation}
+    z_n^{(c)}(kr) = \begin{cases}
+        j_n(kr) & , c = 1 \\
+        n_n(kr) & , c = 2 \\
+        h_n^{(1)}(kr) = j_n(kr) + i n_n(kr) & , c = 3 \\
+        h_n^{(2)}(kr) = j_n(kr) - i n_n(kr) & , c = 4
+    \end{cases}
+\end{equation}
+In this case the Hankel function of second kind (\(j_n-iy_n)\) is used as \(z_n\), since only outward travelling waves are considered and the sources are assumed to have finite extend. The coefficients \(a_{e,o_{mn}}\) and \(b_{e,o_{mn}}\) an be obtained by solving the following integrals:
+\begin{equation}
+    \begin{split}
+        a_{e,0_{mn}} =& \frac{1}{\left[z_n(kr_1)\right]^2} \frac{2n+1}{\pi 2n (n+1)} \frac{(n-m)!}{(n+m)!} \\
+        &\cdot \int_0^{2\pi} \int_0^{\pi} -\mathbf{m}_{e,o_{mn}} \cdot \mathbf{E}(r_1, \theta, \phi)_{\tan} \sin \theta \, d\theta \, d\phi\\
+        b_{e,o_{mn}} = &\frac{1}{\left[(1/kr_1)(\partial/\partial r) [r_1 z_n(kr_1)]\right]^2} \frac{2n + 1}{\pi 2n (n+1)} \frac{(n - m)!}{(n + m)!}\\
+        &\cdot \int_0^{2\pi} \int_0^{\pi} -\mathbf{n}_{e,o_{mn}} \cdot \mathbf{E}(r_1, \theta, \phi)_{\tan} \sin \theta \, d\theta \, d\phi
+    \end{split}
+    \label{eq:expansion}
+\end{equation}
+Initial trials applied the formulas from \citet{Ludwig1971NearfieldFT} to expand the field of a simulated dipole antenna into spherical wave coefficients \(a_{e,o_{mn}}\) and \(b_{e,o_{mn}}\). The reconstructed field, derived from these coefficients, exhibited identical spatial patterns to the original field in 3D visualizations, but the magnitude scaling was inconsistent. Despite extensive literature review, the discrepancy remained unresolved. These coefficients would have served as a critical reference for validating subsequent Sparse Bayesian Learning results.
+
+
+\subsection{SBL for Near Field Patterns}
+\citet{Hofmann2019minimum} showed that the near-field of an antenna can be characterized with a minimum number of measurements under the assumption of sparsity in the spherical harmonics domain. The approach is based on expressing the near-field \(\mathbf{E}(r,\theta,\phi)\) as a linear combination of spherical vector wave functions \(\mathbf{h}_{smn}^{(4)}\). The theoretical framework is described in detail in \citet{hansen1988spherical}. In the following sections, the notation of Hansen will be used. The near-field is expressed as:
+
+In this notation, \(s=1\) corresponds to \(\mathbf{n}\)-vector functions and \(s=2\) to the \(\mathbf{m}\)-vector functions. The use of even \(e\) and odd \(o\) modes is omitted by replacing \(\sin\) and \(\cos\) with complex exponential functions, reducing four real functions to two complex ones. The normalization is also modified. However, this notation is less common, and no explicit formulas for expansion via integration were found. Attempts to derive them independently were unsuccessful, resulting in incorrect magnitudes in the reconstructed field. Despite this, the compactness of the notation made it preferable for Sparse Bayesian Learning (SBL).
 \begin{equation}
     \label{eq:hansenEfield}
     \mathbf{E}(r,\theta,\phi) = \frac{k}{\sqrt{\eta}}\sum_{c=3}^4\sum_{s=1}^2 \sum_{n=1}^\infty \sum_{m=-n}^m Q_{smn}^{(c)} \mathbf{F}_{smn}^{(c)}(r,\theta,\phi).
@@ -504,34 +545,75 @@ The radial function \(z_n^{(c)}(kr)\) depend on the wave type \(c\) and are defi
         h_n^{(2)}(kr) = j_n(kr) - i n_n(kr) & , c = 4
     \end{cases}
 \end{equation}
-\subsection{Classic Spherical-Wave Expansion}
-As a comparision and baseline for the later experiments with SBL in conjuction with spherical harmonics, code for "classic" spherical-wave expansion was implemented. Since neither \citet{hansen1988spherical} nor \citet{Hofmann2019minimum} provide a formulas to obtain the coefficients \(Q_{smn}^{(c)}\) from equation \ref{eq:hansenEfield} and the attempts to derive a formula by my own did not turn out to be successful, another notation had to be used. \citet{Ludwig1971NearfieldFT} presents how to derive the coefficients \(a_{e,o_{mn}}\) (TE waves) and \(b_{e,o_{mn}}\) (TM waves) in order to present the electric field like:
-\begin{equation}
-    \mathbf{E}(r,\theta,\phi)=-\sum_{m=-n}^n \sum_{n=1}^\infty a_{e,o_{mn}} \mathbf{m}_{e,o_{mn}} + b_{e,o_{mn}} \mathbf{n}_{e,o_{mn}}
-\end{equation}
-where the harmonic functions are defined as
-\begin{equation}
-    \begin{split}
-        \mathbf{m}_{e,o_{mn}} =& \mp z_n(kr) \frac{m P_n^m(\cos \theta)}{\sin \theta} \stackanchor{$\sin$}{$\cos$} m \phi \, \boldsymbol{\hat{\theta}} \\
-        &- z_n(kr) \frac{\partial}{\partial \theta} P_n^m(\cos \theta)\stackanchor{$\cos$}{$\sin$}m\phi \boldsymbol{\hat{\phi}}\\
-        \mathbf{n}_{e,o_{mn}} =& n(n+1) \frac{z_n(kr)}{kr} P_n^m(\cos \theta)\stackanchor{$\sin$}{$\cos$} m \phi \boldsymbol{\hat{r}} \\
-        &+ \frac{1}{kr} \frac{\partial}{\partial r} \left[ r z_n(kr) \right] \frac{\partial}{\partial \theta} P_n^m(\cos \theta)\stackanchor{$\sin$}{$\cos$} m \phi \boldsymbol{\hat{\theta}} \\
-        &\pm \frac{1}{k r} \frac{\partial}{\partial r} \left[r z_n(k r) \right] \frac{m P_n^m(\cos \theta)}{\sin \theta}\stackanchor{$\cos$}{$\sin$} m \phi \boldsymbol{\hat{\phi}}
-    \end{split}
-\end{equation} 
-In this case the Hankel function of second kind (\(j_n-iy_n)\) is used as \(z_n\), since only outward travelling waves are considered and the sources are assumed to have finite extend. The coefficients \(a_{e,o_{mn}}\) and \(b_{e,o_{mn}}\) an be obtained by solving the following integrals:
-\begin{equation}
-    \begin{split}
-        a_{e,0_{mn}} =& \frac{1}{\left[z_n(kr_1)\right]^2} \frac{2n+1}{\pi 2n (n+1)} \frac{(n-m)!}{(n+m)!} \\
-        &\cdot \int_0^{2\pi} \int_0^{\pi} -\mathbf{m}_{e,o_{mn}} \cdot \mathbf{E}(r_1, \theta, \phi)_{\tan} \sin \theta \, d\theta \, d\phi\\
-        b_{e,o_{mn}} = &\frac{1}{\left[(1/kr_1)(\partial/\partial r) [r_1 z_n(kr_1)]\right]^2} \frac{2n + 1}{\pi 2n (n+1)} \frac{(n - m)!}{(n + m)!}\\
-        &\cdot \int_0^{2\pi} \int_0^{\pi} -\mathbf{n}_{e,o_{mn}} \cdot \mathbf{E}(r_1, \theta, \phi)_{\tan} \sin \theta \, d\theta \, d\phi
-    \end{split}
-\end{equation}
 
 \subsection{Implementation}
 In the SBL framework, the spherical harmonics domain is embedded by representing the measured electromagnetic field as a linear combination of spherical vector wave functions, which serve as the basis functions. The measurement matrix $\Phi$ (or $F$ in the code) has dimensions $(N, D, 3)$, where $N$ is the number of spatial sampling points (each corresponding to a unique pair of angles $(\theta, \phi)$), $D$ is the total number of spherical harmonics modes (indexed by $(n, m, s)$), and the third dimension corresponds to the three Spherical field components (e.g., $E_r$, $E_\theta$, $E_\phi$). The measurement vector $\mathbf{t}$ is initially a matrix of shape $(N, 3)$, containing the three field components at each spatial point. To apply the SBL algorithm, which requires a standard linear model with scalar-valued entries, both $\Phi$ and $\mathbf{t}$ are reshaped: $\Phi$ is transformed to a matrix of shape $(3N, D)$ by stacking the field components for all points, and $\mathbf{t}$ is flattened to a vector of length $3N$. This allows the vector-valued measurement problem to be cast as a standard SBL problem, where the physical structure of the spherical harmonics expansion is preserved in the dictionary and the mapping between physical and matrix dimensions is explicit.
 
+\subsection{Antenna Simulation}
+
+\subsection{Antenna Simulation}
+
+To validate the SBL-based near-field reconstruction approach described above, a set of synthetic antenna measurements was generated using MATLAB's Antenna Toolbox. Initially, an attempt was made to simulate more complex antenna structures in CST Microwave Studio. However, due to limitations in the student version of CST, specifically the lack of support for exporting radiation patterns in spherical coordinates, this path was not viable for generating high-resolution spherical near-field data.
+
+An alternative approach was adopted by modeling simple canonical antennas—specifically, a half-wave dipole and a loop antenna—operating at 2.4 GHz using MATLAB’s built-in functions. These provide well-defined and analytically tractable radiation characteristics, making them ideal for testing and validating reconstruction algorithms. The simulated electric field patterns were exported in spherical coordinates $(r, \theta, \phi)$, with a resolution of $1^\circ$ in both the polar ($\theta$) and azimuthal ($\phi$) directions.
+
+Two distinct radial distances were considered for the field evaluation:
+\begin{itemize}
+    \item $r = 0.5\lambda$: representing the reactive near-field region.
+    \item $r = 5\lambda$: approximating the radiating far-field region.
+\end{itemize}
+
+This allowed for comparative analysis between near- and far-field reconstructions, as well as verification of the method’s ability to capture the transition from near- to far-field behavior. The field components $E_r$, $E_\theta$, and $E_\phi$ were sampled on a uniform spherical grid at each radius, forming the measurement vector $\mathbf{t}$ used in the SBL framework. 
+
+The results can be seen in figure \ref{fig:dipole_rad}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/Dipol_radiation.png}
+    \caption{The magnitude of the farfield radiation pattern of the dipole antenna.}
+    \label{fig:dipole_rad}
+\end{figure}
+
+
+\subsection{Far-Field Pattern Expansion and Reconstruction}
+
+Initial experiments focused on the expansion of the simulated far-field radiation patterns into spherical vector wave harmonics, followed by their reconstruction using the derived coefficients. The electric field data obtained from MATLAB Antenna Toolbox at a radial distance of $r = 5\lambda$ (representing the far-field region) was used for this purpose.
+
+The measurement matrix $\Phi$ (denoted as $F$ in implementation) was constructed based on the theoretical expressions of the spherical vector wave functions $\mathbf{F}_{smn}^{(c)}$, evaluated at the corresponding wavenumber $k$ and radius $r$. Subsequently, the wave coefficients $Q_{smn}^{(3)}$—corresponding to outward-propagating waves—were estimated using the Fast Marginal Likelihood Maximization algorithm.
+
+To assess the accuracy of the expansion and reconstruction process, the original field $\mathbf{E}_{\text{org}}$ was reconstructed via $\mathbf{E}_{\text{rec}} = \Phi \mathbf{w}$, where $\mathbf{w}$ represents the estimated coefficient vector. The relative reconstruction error was quantified using the normalized mean squared error (MSE):
+\[
+\text{MSE}_{\text{rel}} = \frac{\|\mathbf{E}_{\text{rec}} - \mathbf{E}_{\text{org}}\|}{\|\mathbf{E}_{\text{org}}\|}.
+\]
+
+These experiments were conducted using $N_{\text{modes}} = 25$, resulting in a total of $D = 2N_{\text{modes}}^2 + 4N_{\text{modes}} = 1350$ basis functions. The spatial resolution of the input field was systematically reduced by downsampling the angular sampling grid $(\theta, \phi)$ with a factor $k$, leading to a varying number of measurement points $N$. The ratio $\delta = N/D$ was used as an independent variable to evaluate the reconstruction performance under different undersampling conditions.
+
+Figure \ref{fig:mse_ff} shows the relative MSE as a function of $\delta$ for both the dipole and loop antennas. Notably, even at $\delta=1$, where the number of measurements equals the number of unknowns, significant reconstruction errors are observed, particularly for the loop antenna. Ideally, a perfect reconstruction should be achievable in such a scenario, suggesting potential issues related to numerical inaccuracies, implementation flaws in the spherical vector wave functions $\mathbf{F}_{smn}^{(c)}$, or misinterpretations of the underlying electromagnetic theory.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{Figures/delta_vs_mse_ff.png}
+    \caption{Relative reconstruction error (normalized MSE) as a function of the measurement-to-dimension ratio $\delta = N/D$ for dipole and loop antennas in the far-field configuration.}
+    \label{fig:mse_ff}
+\end{figure}
+
+In contrast, the dipole antenna exhibits robust reconstruction performance even under substantial undersampling, indicating that its radiation pattern is well-represented within the sparse spherical harmonics domain. However, the consistently higher reconstruction error for the loop antenna underscores the strong dependence of SBL performance on the specific radiation characteristics and topology of the source.
+
+To further investigate the observed discrepancies and to validate the SBL results, a comparison was made between the coefficients obtained via the Fast Marginal Likelihood Algorithm and those computed through direct mode expansion using numerical integration, as theoretically described in Equation \ref{eq:expansion}. For the dipole antenna, there was a notable agreement between the dominant coefficients identified by both methods, as illustrated in Figure \ref{fig:dipole_weights}. This consistency supports the validity of the SBL-based estimation approach.
+
+However, for the loop antenna, shown in Figure \ref{fig:loop_weights}, no such correspondence was observed. These results suggest either a fundamental difference in the sparsity structure of the loop antenna’s field representation or unresolved inaccuracies in the implementation of the spherical wave basis functions. A fully validated wave mode expansion method would have been essential for clarifying these observations; unfortunately, such a method could not be reliably implemented due to the challenges previously described.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Figures/dipole_ff_weights.png}
+    \caption{Comparison of wave coefficients for the dipole antenna: non-zero weights estimated by the Fast Marginal Likelihood Algorithm (left) versus significant coefficients obtained via direct integration (right).}
+    \label{fig:dipole_weights}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Figures/loop_ff_weights.png}
+    \caption{Comparison of wave coefficients for the loop antenna: non-zero weights estimated by the Fast Marginal Likelihood Algorithm (left) versus significant coefficients obtained via direct integration (right).}
+    \label{fig:loop_weights}
+\end{figure}
 
 
 \bibliography{Compressive_Sensing_Report}

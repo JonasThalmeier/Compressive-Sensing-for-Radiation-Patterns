@@ -287,7 +287,7 @@ def inverse_nm_expansion(coefficients, r, theta, phi, k):
         Mag_Ephi=Mag_Ephi
     )
 
-def F_matrix(R=1, Theta_steps=18, Phi_steps=36, N_modes=50, c = 3, k=1):
+def F_matrix(R=1, Theta_steps=18, Phi_steps=36, N_modes=50, c = 3, k=1, NF=True):
     N = Theta_steps * Phi_steps
     D = 2*N_modes**2+4*N_modes
     # Step 1: Build matrix of spherical wave coefficients
@@ -301,7 +301,7 @@ def F_matrix(R=1, Theta_steps=18, Phi_steps=36, N_modes=50, c = 3, k=1):
                 for m in np.arange(-n, n+1):
                     idx1 = (int(Theta_idx*Phi_steps + Phi_idx), int(n**2+n-1+m))
                     idx2 = (int(Theta_idx*Phi_steps + Phi_idx), int(n**2+n-1+m+D/2))
-                    F[idx1[0], idx1[1], :], F[idx2[0], idx2[1], :] = Fmnc(m, n, c, R, Theta, Phi, k)
+                    F[idx1[0], idx1[1], :], F[idx2[0], idx2[1], :] = Fmnc(m, n, c, R, Theta, Phi, k, NF)
     for n in np.arange(1, N_modes+1):
                 for m in np.arange(-n, n+1):
                     nms_idx[int(n**2+n-1+m),:] = [n, m, 1]
@@ -359,7 +359,7 @@ def abF_matrix_alt(theta, phi, R=1, N_modes=50, k=1):
     F = np.concatenate([Fme,Fmo,Fne,Fno],axis=1)
     return F, nms_idx, ThetaPhi_idx
 
-def F_expansion(Efield, max_n, k, r, c=3):
+def F_expansion(Efield, max_n, k, r, c=3, NF=True):
     """
     Calculate spherical harmonics coefficients for E-field components.
     
@@ -398,7 +398,7 @@ def F_expansion(Efield, max_n, k, r, c=3):
             for i, th in enumerate(theta):
                 for j, ph in enumerate(phi):
                     # Get vector spherical harmonic
-                    F1,F2 = Fmnc(-m, n, c, r, th, ph, k)
+                    F1,F2 = Fmnc(-m, n, c, r, th, ph, k, NF)
                     # Dot product with E-field conjugate
                     dot_product_F1 = (Eth[i,j]*F1[1] + 
                                       Ephi[i,j]*F1[2])

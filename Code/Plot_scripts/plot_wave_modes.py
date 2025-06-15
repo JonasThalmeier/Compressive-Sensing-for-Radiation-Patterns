@@ -30,8 +30,8 @@ Y = np.sin(THETA) * np.sin(PHI)
 Z = np.cos(THETA)
 
 # Select a specific mode (e.g., first mode)
-n = 1
-m = 0
+n = 5
+m = 2
 s = 1
 mode_idx = n**2+n-1+m+(s-1)*N_modes*(N_modes+2)  # Choose a specific index in the range [0, D-1]
 w_single = np.zeros(F.shape[1])

@@ -114,7 +114,21 @@ def load_nearfield(filename, undersampling=1):
     Efield = namedtuple('Efield', ['theta', 'phi', 'Re_Er', 'Re_Etheta', 'Re_Ephi', 
                               'Im_Er', 'Im_Etheta', 'Im_Ephi',
                               'Mag_Er', 'Mag_Etheta', 'Mag_Ephi'])
-    
+    # reshape_fields = lambda x: x.reshape(n_phi, n_theta).T  # Transpose to match MATLAB
+
+    # return Efield(
+    #     theta=unique_theta,
+    #     phi=unique_phi,
+    #     Re_Er=reshape_fields(Re_Er),
+    #     Re_Etheta=reshape_fields(Re_Etheta),
+    #     Re_Ephi=reshape_fields(Re_Ephi),
+    #     Im_Er=reshape_fields(Im_Er),
+    #     Im_Etheta=reshape_fields(Im_Etheta),
+    #     Im_Ephi=reshape_fields(Im_Ephi),
+    #     Mag_Er=reshape_fields(Er),
+    #     Mag_Etheta=reshape_fields(Etheta),
+    #     Mag_Ephi=reshape_fields(Ephi)
+    # )
     return Efield(
         theta=unique_theta,
         phi=unique_phi,
