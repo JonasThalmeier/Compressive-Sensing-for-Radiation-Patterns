@@ -157,14 +157,7 @@ In my implementation, the update of $\sigma^2$ was simplified or deferred for st
 
 \subsection{Implementation Remarks}
 
-The algorithm was implemented in Python based directly on the formulation in \citet{wipf2004sparse}. A simplified version of the EM loop is shown below:
-
-\begin{verbatim}
-mu, Sigma = estimate_posterior()
-gamma = mu**2 + np.diag(Sigma)
-\end{verbatim}
-
-The evolution of weights was tracked during training for diagnostic purposes, and convergence is monitored using the maximum change in $\mu$ and the relative mean squared error with respect to $\mathbf{t}$.
+The algorithm was implemented in Python based directly on the formulation in \citet{wipf2004sparse}. The evolution of weights was tracked during training for diagnostic purposes, and convergence is monitored using the maximum change in $\mu$ and the relative mean squared error with respect to $\mathbf{t}$.
 
 The main practical limitation of this approach lies in the need to invert a $D \times D$ matrix at every iteration to compute $\Sigma_w$, making it computationally expensive for high-dimensional problems. This is noted in the original paper as well \cite[p.~2155]{wipf2004sparse}, and future work may include reformulating the algorithm to reduce this complexity using the Woodbury identity or low-rank approximations.
 
@@ -746,15 +739,21 @@ Relying primarily on relative Mean Squared Error (MSE) between field measurement
 
 The use of MATLAB for simulations, while technically viable, introduced inefficiencies due to my limited familiarity with the environment of the antenna toolbox. Future efforts would benefit from transitioning to a more specialized and familiar simulation platform, such as CST Microwave Studio, which could provide more accurate and representative field data.
 
-However, despite these challenges, the theoretical foundation suggests that successful near-field to far-field transformation using sparse measurements is indeed feasible with the right modeling and algorithmic choices. Recent work by \citet{Hofmann2019minimum} demonstrates that minimum-energy extrapolation methods can yield highly accurate far-field reconstructions from limited near-field data. With further theoretical development and a deeper understanding of the underlying physics, similar results may be achievable using compressive sensing and sparse learning techniques. That said, realizing this potential will require substantial additional investigation into both the numerical implementation and the physical assumptions involved.
-\subsection{Code}
+However, despite these challenges, the theoretical foundation suggests that successful near-field to far-field transformation using sparse measurements is indeed feasible with the right modeling and algorithmic choices. Recent work by \citet{Hofmann2019minimum} demonstrates that SBL methods can yield highly accurate far-field reconstructions from limited near-field data. With further theoretical development and a deeper understanding of the underlying physics, the results could be reproduced and possibly even enhanced. That said, realizing this potential will require substantial additional investigation into both the numerical implementation and the physical assumptions involved.
 
+\subsection{Code}
 While coding was not the central focus of the project, it played an essential role in enabling experimentation and analysis. A variety of functions were developed, including the core SBL algorithms and tools for evaluating radiation patterns. Significant effort was invested in ensuring the codebase was clean, reusable, and efficient—goals that were largely met, particularly in modules designed for comparative analysis of radiation patterns.
 
 That said, there are areas where the code can be improved. Some sections remain overly complex and would benefit from refactoring. The overall structure could be streamlined for greater clarity, and additional comments should be added to improve readability and maintainability. Furthermore, inconsistencies in function interfaces and argument usage could be addressed to enhance code coherence. Despite these considerations, the developed software forms a strong and extensible foundation for future research in this area.
 
-\subsection{Use of Large Language Models (LLMs)} 
+\subsection{Possible Next Steps}
+Future work could focus on addressing the current limitations and extending the applicability of compressive sensing techniques to near-field to far-field transformations. A key priority is to successfully implement the spherical wave expansion via numerical integration, which would provide a reliable ground truth for evaluating the accuracy of Sparse Bayesian Learning reconstructions. With a validated integration-based expansion method in place, meaningful comparisons can be made between estimated and "true" SWE coefficients, enabling a deeper understanding of the fidelity of sparse recovery methods.
 
+In parallel, efforts should be directed toward refining the SBL framework by first ensuring accurate reconstruction in the absence of undersampling ($\delta = 1$), before gradually reducing the number of measurements to investigate how sparsity constraints affect performance. This will help identify the practical limits of measurement reduction.
+
+Additionally, an in-depth analysis of the distribution of SWE coefficients across different antenna types could be conducted to explore their inherent sparsity structure. This insight can inform more effective prior modeling within the SBL framework, potentially improving convergence and estimation accuracy. Finally, a systematic study will be carried out to assess the sensitivity of the reconstruction process to various physical and experimental parameters—such as the radial distance of near-field measurements, non-uniform or truncated measurement grids, noise levels, and different antenna topologies. These investigations will not only enhance theoretical understanding but also guide the design of more robust and efficient measurement strategies in real-world antenna characterization scenarios.
+
+\subsection{Use of Large Language Models (LLMs)} 
 Large Language Models (LLMs) were used throughout the project as tools to assist with code development and writing. They helped with debugging, generating code comments, improving readability, and automating plotting scripts, which enhanced coding efficiency. 
 
 In the final stages of report preparation, LLMs were also used to rephrase and polish the text for clarity, conciseness, and grammatical accuracy. 

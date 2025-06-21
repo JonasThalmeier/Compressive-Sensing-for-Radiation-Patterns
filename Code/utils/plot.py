@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from utils.Process_sim_data import load_nearfield, transform_nearfield_to_vector, transform_vector_to_nearfield
 from utils.plot_settings import get_figsize, LINE_STYLES, DPI
+import matplotlib.lines as mlines
 
 
 
@@ -122,7 +123,7 @@ def plot_coefficient_magnitudes(*coeff_arrays):
     plt.show()
 
 def plot_Fcoefficient_magnitudes(*coeff_arrays):
-    """Visualize coefficient magnitudes with optional comparison."""
+    """Visualize coefficient magnitudes with optional comparison and markers."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
     
     # Collect all magnitudes for global color scaling
@@ -136,6 +137,11 @@ def plot_Fcoefficient_magnitudes(*coeff_arrays):
     base_dir = os.path.dirname(os.path.dirname(__file__))
     figure_dir = os.path.join(base_dir, "figures")
     os.makedirs(figure_dir, exist_ok=True)
+
+    markers = ['o', 'x', '^', 's']
+    labels = ['SBL', 'Expansion', 'Coeffs3', 'Coeffs4']
+    proxy_artists = []
+
     # Plot each dataset
     for i, arr in enumerate(coeff_arrays):
         n, m, s, vals = arr
@@ -155,19 +161,24 @@ def plot_Fcoefficient_magnitudes(*coeff_arrays):
         # Plot for each s category
         for st, ax in zip([1, 2], [ax1, ax2]):
             mask = s == st
-            ax.scatter(n[mask], m[mask], c=magnitudes[mask], 
-                      cmap='plasma', s=50, alpha=0.7,
-                      vmin=vmin, vmax=vmax+2)
+            sc = ax.scatter(n[mask], m[mask], c=magnitudes[mask], 
+                            cmap='viridis', s=50, alpha=0.7,
+                            vmin=vmin, vmax=vmax, marker=markers[i % len(markers)])
+        # Add proxy artist for legend
+        proxy_artists.append(
+            mlines.Line2D([], [], color='k', marker=markers[i % len(markers)],
+                          linestyle='None', markersize=8, label=labels[i])
+        )
     
     # Configure plots
     for ax, st in zip([ax1, ax2], [1, 2]):
         ax.set_xlabel('n')
         ax.set_ylabel('m')
         ax.set_title(f's = {st}')
-        if ax.collections:
-            fig.colorbar(ax.collections[0], ax=ax, label='Coefficient Magnitude')
+        fig.colorbar(sc, ax=ax, label='Coefficient Magnitude')
+        ax.legend(handles=proxy_artists, loc='best')
     
-    plt.suptitle('Spherical Harmonics Coefficient Magnitudes Comparison' 
+    plt.suptitle('Spherical Harmonics Coefficient Magnitudes Comparison (Loop Antenna)' 
                 if len(coeff_arrays) > 1 
                 else 'Spherical Harmonics Coefficient Magnitudes')
     plt.tight_layout()
