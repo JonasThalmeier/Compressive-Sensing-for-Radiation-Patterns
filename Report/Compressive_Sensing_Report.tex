@@ -54,7 +54,7 @@ Extrapolation}\\
     \vspace{2cm}
     \Large{Jonas Thalmeier}\\
     \vspace{1cm}
-    30/04/2025
+    20/06/2025
 \end{center}
 \vspace{3cm}
 \begin{figure}[h]
@@ -69,12 +69,23 @@ Extrapolation}\\
 \newpage
 \setcounter{page}{1}
 
+\begin{abstract}
+This report presents an investigation into the application of compressive sensing techniques for near-field to far-field extrapolation of antenna radiation patterns. The study involved a comprehensive review and implementation of sparse learning algorithms, including Expectation-Maximization (EM), Covariance-Free Expectation-Maximization (CoFEM), and, most successfully, Sparse Bayesian Learning (SBL) using Stein’s Unbiased Risk Estimate (SURE). The SBL algorithm was implemented efficiently and demonstrated robust performance across multiple test cases. 
+
+The project also included a detailed exploration of electrodynamics fundamentals, with a focus on spherical vector wave expansions and their application in modeling radiation patterns. This provided a solid theoretical basis for understanding near-field to far-field transformations. Additionally, MATLAB simulations were used to validate field reconstructions at different radial distances, offering insights into the behavior of radiated fields. 
+
+Overall, this work demonstrates the potential of compressive sensing methods in improving antenna measurement techniques through efficient data acquisition and accurate field reconstruction.
+\end{abstract}
+
 \section{Introduction}
 This semester project is carried out within the framework of the Data Science track of the Master program and is supervised by Prof. Dirk Slock, Dr. Zilu Zhao, and Dr. Fangqing Xiao. The project focuses on the theory and application of compressive sensing, a signal processing technique that allows for the recovery of sparse signals from undersampled measurements.
 
 In the first phase (100-hour scope), the project explores state-of-the-art methods in compressive sensing, with particular attention to Sparse Bayesian Learning (SBL) and the use of Stein’s Unbiased Risk Estimate (SURE) for adaptive hyperparameter tuning in the SBL prior. Theoretical understanding and simulation-based validation on synthetic data are key objectives of this part.
 
 In the extended 200-hour version, the project further investigates the practical application of compressive sensing techniques to antenna pattern extrapolation, specifically in transitioning from near-field to far-field measurements. This includes the construction of appropriate dictionaries or sensing matrices, initially based on simplified analytical models of antenna radiation patterns.
+
+\section{Motivation}
+In antenna characterization, the far-field radiation pattern is often the primary quantity of interest, as it provides critical information about the antenna’s performance in terms of directivity, gain, and beamforming capabilities. However, direct far-field measurements are typically impractical due to spatial constraints and propagation losses, making near-field measurements the preferred alternative. Classical near-field to far-field transformation (NFFFT) techniques rely on acquiring dense field samples over a surrounding spherical surface to accurately characterize the near-field distribution and enable precise far-field extrapolation. Two major challenges arise in this context: first, physical limitations often result in truncated measurement regions, where not all angular directions around the antenna are accessible; second, the acquisition of each measurement is time-consuming, leading to prolonged overall measurement times. This project explores strategies to reduce the number of required near-field measurements without compromising the accuracy of the predicted far-field pattern—addressing primarily the second challenge. To this end, we leverage the theoretical foundations of compressive sensing and Sparse Bayesian Learning, which offer the potential to reconstruct sparse or compressible signals from significantly fewer measurements than traditionally required.
 
 \section{Synthetic Data Generation}
 
@@ -171,7 +182,7 @@ In the E-step, the algorithm solves one linear system to compute the posterior m
 
 where $ \mu_j $ is the $ j $-th component of the posterior mean and $ s_j $ is the estimated variance of $ w_j $ obtained from the Rademacher probe-based approximation.
 
-Although the CoFEM algorithm is designed to benefit from conjugate gradient (CG) solvers for efficiently handling large-scale linear systems, the custom CG implementation used in this project proved to be slower than expected. In practice, it exhibited slower convergence and higher runtime compared to NumPy’s built-in direct solver.. As a result, the final implementation resorts to NumPy’s \texttt{np.linalg.solve} for solving the linear systems in the E-step, which yielded higher performance for the problem sizes considered in this study.
+Although the CoFEM algorithm is designed to benefit from conjugate gradient (CG) solvers for efficiently handling large-scale linear systems, the custom CG implementation used in this project proved to be slower than expected. In practice, it exhibited slower convergence and higher runtime compared to NumPy’s built-in direct solver. As a result, the final implementation resorts to NumPy’s \texttt{np.linalg.solve} for solving the linear systems in the E-step, which yielded higher performance for the problem sizes considered in this study.
 
 To assess the scalability, the runtime of the EM and CoFEM algorithm was measured as a function of the number of measurements $ N $, with parameters set as follows:  $ D = 3N $, sparsity level $ \rho = 0.1 $, and noise variance $ \sigma^2 = 10^{-6} $. The algorithms iterated until the relative residual dropped below 1e-2:
 \begin{equation}
@@ -235,7 +246,7 @@ In contrast, the algorithm described in Section \ref{sec:SBL_SURE}, which incorp
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_sparsity_FFTGauss_EM.png}
-    \caption{Reconstruction accuracy (NRMSE) versus undersampling factor $ \delta $.}
+    \caption{Reconstruction accuracy (NRMSE) versus sparsity factor $ \rho $.}
     \label{fig:accuracy_vs_sparsity_EM_gaussFFT}
 \end{figure}
 
@@ -307,28 +318,54 @@ where $\mathbf{R} = \mathbf{A}\mathbf{P}\mathbf{A}^T + \sigma^2 \mathbf{I}$. Alt
 
 with $\mathbf{S} = \mathbf{A}^T\mathbf{A} + \sigma^2 \mathbf{P}^{-1}$. 
 
-\subsection{Connection to Tipping's Fast Marginal Likelihood Algorithm}
-The posterior expressions derived above align with the sparse Bayesian framework described in \citet{tipp2003fastsb}. By adopting the notation used in Tipping's paper, where $\mathbf{A} \rightarrow \boldsymbol{\Phi}$, $\mathbf{y} \rightarrow \mathbf{t}$, $\mathbf{x} \rightarrow \mathbf{w}$, and $\mathbf{P} \rightarrow \mathbf{A}^{-1}$, the posterior mean and covariance become:
-
+The optimization of hyperparameters, particularly the prior variances \( p_i \) for each component of \(\mathbf{x}\), is critical in the Sparse Bayesian Learning (SBL) framework.  To derive the SURE-based update for the prior variances, consider the simplified additive noise model \(\mathbf{y} = \mathbf{z} + \mathbf{v}\), where \(\mathbf{v} \sim \mathcal{N}(\mathbf{v}; \mathbf{0}, \sigma^2 \mathbf{I})\). For an estimator \(\hat{\mathbf{z}}(\mathbf{y})\) of \(\mathbf{z}\), the SURE is given by:
 \begin{equation}
-    \boldsymbol{\mu} = \sigma^{-2}\boldsymbol{\Sigma}\boldsymbol{\Phi}^T\mathbf{t}, \quad \boldsymbol{\Sigma} = \left(\mathbf{A} + \sigma^{-2}\boldsymbol{\Phi}^T\boldsymbol{\Phi}\right)^{-1}.
+    \text{SURE}_{\mathbf{z}} = \|\hat{\mathbf{z}} - \mathbf{y}\|^2 + 2\sigma^2 \text{tr}\left\{\frac{\partial\hat{\mathbf{z}}^T}{\partial \mathbf{y}}\right\},
 \end{equation}
+where the first term captures the bias, and the second term accounts for the variance and noise effects. 
 
-These expressions are identical to those derived in \citet{tipp2003fastsb} for the posterior distribution of the weights $\mathbf{w}$ in the sparse Bayesian learning framework. This equivalence confirms that the Fast Marginal Likelihood Maximisation algorithm proposed by Tipping can be directly applied to implement SBL with SURE in our setting.
+Within the SBL framework, the \(i\)-th component of the Linear Minimum Mean Squared Error (LMMSE) estimate, \(\hat{x}_i(p_i)\), can be expressed as:
+\begin{equation}
+    \hat{x}_i(p_i) = \frac{p_i}{p_i + \sigma^2}\hat{x}_i(0),
+\end{equation}
+where \(\hat{x}_i(0)\) is the noisy observation of \(x_i\) with variance \(\sigma^2\). The corresponding SURE for this component is:
+\begin{equation}
+    \text{SURE}_{x_i}(p_i) = \left(\frac{\sigma^2}{p_i + \sigma^2}\hat{x}_i(0)\right)^2 + 2\frac{\sigma^2 p_i}{p_i + \sigma^2}.
+\end{equation}
+Minimizing \(\text{SURE}_{x_i}(p_i)\) with respect to \(p_i\) yields the optimal prior variance:
+\begin{equation}
+    \frac{\partial \text{SURE}_{x_i}}{\partial p_i} = 2\sigma^4 \frac{p_i + \sigma^2 - \hat{x}_i^2(0)}{(p_i + \sigma^2)^3} = 0.
+\end{equation}
+This equation has a solution at \(p_i = \hat{x}_i^2(0) - \sigma^2\), which must be non-negative. Thus, the optimal prior variance is obtained via rectification:
+\begin{equation}
+    p_i = \lfloor|\hat{x}_i(0)|^2 - \sigma^2\rfloor_+.
+\end{equation}
+Remarkably, this result aligns precisely with the optimal prior variance derived from Variational Bayes (VB) or Type II Maximum Likelihood (ML) estimation.
 
-The algorithm proceeds as follows:
-\begin{enumerate}
-    \item Initialize the hyperparameters $\boldsymbol{\alpha}$ and noise variance $\sigma^2$.
-    \item Initialize the set of active basis $\mathcal{A}$ and compute the posterior statistics $\boldsymbol{\mu}$ and $\boldsymbol{\Sigma}$ using the current hyperparameters.
-    \item Evaluate the marginal likelihood and update $\boldsymbol{\alpha}$ by sequentially adding, deleting, or re-estimating basis functions to maximize the marginal likelihood.
-    \item Iterate until convergence, ensuring that the hyperparameters and noise variance are optimized for minimal mean squared error (MSE) as guided by SURE.
-\end{enumerate}
+
+\subsection{Connection to Tipping's Fast Marginal Likelihood Algorithm}
+The Fast Marginal Likelihood Maximization algorithm proposed by \citet{tipp2003fastsb} provides an efficient framework for sparse Bayesian learning (SBL) by optimizing hyperparameters via Type II Maximum Likelihood (ML). Specifically, the algorithm maximizes the marginal likelihood \(\mathcal{L}(\boldsymbol{\alpha}) = \log p(\mathbf{t}|\boldsymbol{\alpha}, \sigma^2)\), where \(\boldsymbol{\alpha}\) represents the inverse of the prior variances (\(\alpha_i = p_i^{-1}\)) governing the weights \(\mathbf{w}\). This approach is directly applicable to our setting, as the posterior expressions derived earlier align precisely with Tipping's formulation.  
+
+Adopting the notation from \citet{tipp2003fastsb}, where \(\mathbf{A} \rightarrow \boldsymbol{\Phi}\), \(\mathbf{y} \rightarrow \mathbf{t}\), \(\mathbf{x} \rightarrow \mathbf{w}\), and \(\mathbf{P} \rightarrow \mathbf{A}^{-1}\), the posterior mean and covariance become:  
+\begin{equation}
+    \boldsymbol{\mu} = \sigma^{-2}\boldsymbol{\Sigma}\boldsymbol{\Phi}^T\mathbf{t}, \quad \boldsymbol{\Sigma} = \left(\mathbf{A} + \sigma^{-2}\boldsymbol{\Phi}^T\boldsymbol{\Phi}\right)^{-1},
+\end{equation}  
+which are identical to the posterior statistics for the weights \(\mathbf{w}\) in Tipping's framework. This equivalence confirms that the Fast Marginal Likelihood algorithm can be employed to implement SBL with SURE, combining hyperparameter optimization via Type II ML with risk-aware updates guided by SURE.  
+
+The algorithm proceeds iteratively as follows:  
+\begin{enumerate}  
+    \item Initialize the hyperparameters \(\boldsymbol{\alpha}\) (inverse prior variances) and noise variance \(\sigma^2\).  
+    \item Initialize the set of active basis $\mathcal{A}$ and compute the posterior statistics \(\boldsymbol{\mu}\) and \(\boldsymbol{\Sigma}\) using the current \(\boldsymbol{\alpha}\) and \(\sigma^2\).  
+    \item Update \(\boldsymbol{\alpha}\) by adding, deleting, or re-estimating basis functions to maximize the marginal likelihood \(\mathcal{L}(\boldsymbol{\alpha})\).  
+    \item Iterate until convergence, ensuring hyperparameters and noise variance minimize the MSE, as guided by SURE.  
+\end{enumerate}  
 
 This approach leverages the efficiency of Tipping's algorithm while incorporating the risk estimation principles of SURE to optimize hyperparameters. The result is a computationally tractable implementation of SBL that maintains sparsity and generalizes well, as demonstrated in the experiments reported in \citet{tipp2003fastsb}.
 
+
 \subsection{Implementation of the Fast Marginal Likelihood Algorithm}
 
-The Fast Marginal Likelihood Algorithm is implemented through an efficient basis selection and pruning strategy. Unlike traditional SBL approaches that update all basis functions simultaneously, this implementation sequentially evaluates individual basis functions to maximize the marginal likelihood more efficiently.
+The Fast Marginal Likelihood (FML) algorithm is implemented through an efficient basis selection and pruning strategy. Unlike traditional SBL approaches that update all basis functions simultaneously, this implementation sequentially evaluates individual basis functions to maximize the marginal likelihood more efficiently.
 
 The algorithm begins by initializing a single most relevant basis function, selected by evaluating the correlation between each basis vector and the target signal. All other basis functions are initially deactivated by setting their corresponding $\alpha$ values to infinity. This sparse initialization provides a computationally efficient starting point.
     \begin{equation}
@@ -403,7 +440,7 @@ This efficient implementation enables the algorithm to handle high-dimensional p
 \subsection{Accuracy vs. Undersampling and Sparsity}
 To evaluate the performance of both the SBL-SURE framework and the EM algorithm, we replicated the experimental conditions outlined in Section \ref{sec:PerfEMCoFEMGauss}. While EM and CoFEM exhibited nearly identical reconstruction accuracy in Gaussian measurement systems, the EM algorithm proved unstable for complex-valued (FFT-based) dictionaries, frequently failing to converge. Consequently, EM results for the complex case were excluded from this comparison. Notably, in the rare instances where EM did converge for complex systems, its reconstruction error aligned with its Gaussian performance, suggesting no inherent disadvantage in complex domains—only algorithmic instability.
 
-Tipping’s Fast Marginal Likelihood algorithm, however, demonstrated robust performance across both Gaussian and complex-valued systems. As shown in Figures \ref{fig:accuracy_vs_undersampling_EMSB} and \ref{fig:accuracy_vs_sparsity_EMSB}, its accuracy in Gaussian systems closely matched EM’s, with EM achieving marginal improvements (2–4\% NRMSE reduction or $\Delta\rho\approx 0.05$). Strikingly, in complex-valued systems, Tipping’s method outperformed its own Gaussian results—a paradoxical reversal of trends observed with EM. This suggests that the Fast Marginal Likelihood framework inherently adapts more effectively to structured dictionaries like Fourier bases, despite EM’s theoretical equivalence.
+Tipping’s FML algorithm, however, demonstrated robust performance across both Gaussian and complex-valued systems. As shown in Figures \ref{fig:accuracy_vs_undersampling_EMSB} and \ref{fig:accuracy_vs_sparsity_EMSB}, its accuracy in Gaussian systems closely matched EM’s, with EM achieving marginal improvements (2–4\% NRMSE reduction or $\Delta\rho\approx 0.05$). Strikingly, in complex-valued systems, Tipping’s method outperformed its own Gaussian results—a paradoxical reversal of trends observed with EM. This suggests that the FML framework inherently adapts more effectively to structured dictionaries like Fourier bases, despite EM’s theoretical equivalence.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.75\linewidth]{Figures/accuracy_vs_undersampling_EMvsSB_woEMFFT.png}
@@ -419,7 +456,7 @@ Tipping’s Fast Marginal Likelihood algorithm, however, demonstrated robust per
 \end{figure}
 
 \subsection{Computational Efficiency}
-Figure \ref{fig:runtimeSBl} compares the execution times of EM, CoFEM, and the Fast Marginal Likelihood algorithm under standardized conditions:
+Figure \ref{fig:runtimeSBl} compares the execution times of EM, CoFEM, and the FML algorithm under standardized conditions:
 \begin{itemize}
 \item Sparsity ratio $ \rho = 0.1 $
 \item Noise variance $ \sigma^2 = 10^{-6} $
@@ -430,7 +467,7 @@ Figure \ref{fig:runtimeSBl} compares the execution times of EM, CoFEM, and the F
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.75\linewidth]{Figures/runtime_comp_EMCoFEMSBL.png}
-    \caption{Runtime versus measurement count $N$ for Gaussian dictionaries ($D=3N$). The Fast Marginal Likelihood algorithm exhibits the same computational efficiency as CoFEM and achieves significant speedups over EM, particularly at larger scales.}
+    \caption{Runtime versus measurement count $N$ for Gaussian dictionaries ($D=3N$). The FML algorithm exhibits the same computational efficiency as CoFEM and achieves significant speedups over EM, particularly at larger scales.}
     \label{fig:runtimeSBl}
 \end{figure}
 
@@ -464,9 +501,8 @@ At higher noise levels ($\sigma=0.01$), Figures \ref{fig:weight001Gauss} and \re
     \label{fig:weight001FFT}
 \end{figure}
 
-\section{Spherical Near-Field Antenna Patterns}
-\subsection{Spherical-Wave Expansion}
-
+\section{Spherical-Wave Expansion}
+\subsection{m/n-Notation}
 Spherical wave expansion (SWE) provides a mathematical framework for analyzing electromagnetic fields, particularly those radiated by antennas. By decomposing the electric field \(\mathbf{E}(r, \theta, \phi)\) into a sum of orthogonal spherical wave functions \(\mathbf{m}_{e,o_{mn}}\) and \(\mathbf{n}_{e,o_{mn}}\), SWE enables a systematic representation of the field in terms of outward-traveling waves. The expansion coefficients \(a_{e,o_{mn}}\) and \(b_{e,o_{mn}}\) are determined by projecting the tangential components of the field onto these basis functions, as shown in the integral expressions. This approach is especially useful for antenna characterization, near-field to far-field transformations, and scattering analysis, as it captures the field's angular and radial dependencies in a compact and physically meaningful way. The use of Hankel functions of the second kind ensures that only outward-propagating waves are considered, making SWE well-suited for problems involving radiation from finite sources. \citet{Ludwig1971NearfieldFT} presents how to derive the coefficients \(a_{e,o_{mn}}\) (TE waves) and \(b_{e,o_{mn}}\) (TM waves) in order to present the electric field like:
 \begin{equation}
     \mathbf{E}(r,\theta,\phi)=-\sum_{m=-n}^n \sum_{n=1}^\infty a_{e,o_{mn}} \mathbf{m}_{e,o_{mn}} + b_{e,o_{mn}} \mathbf{n}_{e,o_{mn}}
@@ -490,7 +526,7 @@ where \(P_n^{|m|}(\cos \theta)\) is the associated Legendre function. The radial
         h_n^{(2)}(kr) = j_n(kr) - i n_n(kr) & , c = 4
     \end{cases}
 \end{equation}
-In this case the Hankel function of second kind (\(j_n-iy_n)\) is used as \(z_n\), since only outward travelling waves are considered and the sources are assumed to have finite extend. The coefficients \(a_{e,o_{mn}}\) and \(b_{e,o_{mn}}\) an be obtained by solving the following integrals:
+\(c = 1\) and \(c = 2\) indicate standing waves, while \(c = 3\) represents an outward traveling wave, and \(c = 4\) an inward traveling wave. Since we regard only antennas in transmission mode in the absence of reflection, only \(c=3\) (Hankel function of second kind (\(j_n-iy_n)\)) will be regarded. The coefficients \(a_{e,o_{mn}}\) and \(b_{e,o_{mn}}\) an be obtained by solving the following integrals:
 \begin{equation}
     \begin{split}
         a_{e,0_{mn}} =& \frac{1}{\left[z_n(kr_1)\right]^2} \frac{2n+1}{\pi 2n (n+1)} \frac{(n-m)!}{(n+m)!} \\
@@ -502,18 +538,15 @@ In this case the Hankel function of second kind (\(j_n-iy_n)\) is used as \(z_n\
 \end{equation}
 Initial trials applied the formulas from \citet{Ludwig1971NearfieldFT} to expand the field of a simulated dipole antenna into spherical wave coefficients \(a_{e,o_{mn}}\) and \(b_{e,o_{mn}}\). The reconstructed field, derived from these coefficients, exhibited identical spatial patterns to the original field in 3D visualizations, but the magnitude scaling was inconsistent. Despite extensive literature review, the discrepancy remained unresolved. These coefficients would have served as a critical reference for validating subsequent Sparse Bayesian Learning results.
 
-
-\subsection{SBL for Near Field Patterns}
-\citet{Hofmann2019minimum} showed that the near-field of an antenna can be characterized with a minimum number of measurements under the assumption of sparsity in the spherical harmonics domain. The approach is based on expressing the near-field \(\mathbf{E}(r,\theta,\phi)\) as a linear combination of spherical vector wave functions \(\mathbf{h}_{smn}^{(4)}\). The theoretical framework is described in detail in \citet{hansen1988spherical}. In the following sections, the notation of Hansen will be used. The near-field is expressed as:
-
-In this notation, \(s=1\) corresponds to \(\mathbf{n}\)-vector functions and \(s=2\) to the \(\mathbf{m}\)-vector functions. The use of even \(e\) and odd \(o\) modes is omitted by replacing \(\sin\) and \(\cos\) with complex exponential functions, reducing four real functions to two complex ones. The normalization is also modified. However, this notation is less common, and no explicit formulas for expansion via integration were found. Attempts to derive them independently were unsuccessful, resulting in incorrect magnitudes in the reconstructed field. Despite this, the compactness of the notation made it preferable for Sparse Bayesian Learning (SBL).
+\subsection{F-Notation}
+Alternatively a more compact notation can be used. The approach is based on expressing the near-field \(\mathbf{E}(r,\theta,\phi)\) as a linear combination of spherical vector wave functions \(\mathbf{F}_{smn}^{(c)}\). The theoretical framework is described in detail in \citet{hansen1988spherical}. In the following sections, the notation of Hansen will be used. The near-field is expressed as:
 \begin{equation}
     \label{eq:hansenEfield}
     \mathbf{E}(r,\theta,\phi) = \frac{k}{\sqrt{\eta}}\sum_{c=3}^4\sum_{s=1}^2 \sum_{n=1}^\infty \sum_{m=-n}^m Q_{smn}^{(c)} \mathbf{F}_{smn}^{(c)}(r,\theta,\phi).
 \end{equation}
-\(\mathbf{E}(r,\theta,\phi)\) will correspond to \(\mathbf{t}\) in the SBL framework. Analogously, the spherical vector wave functions \(\mathbf{F}_{smn}^{(c)}(r,\theta,\phi)\) will be denoted as \(\Phi\) and \(Q_{smn}^{(c)}\) as \(\mathbf{w}\).
+In this notation, \(s=1\) corresponds to \(\mathbf{n}\)-vector functions and \(s=2\) to the \(\mathbf{m}\)-vector functions. The use of even \(e\) and odd \(o\) modes is omitted by replacing \(\sin\) and \(\cos\) with complex exponential functions, reducing four real functions to two complex ones. The normalization is also modified. However, this notation is less common, and no explicit formulas for expansion via integration were found. Attempts to derive them independently were unsuccessful, resulting in incorrect magnitudes in the reconstructed field. Despite this, the compactness of the notation made it preferable for Sparse Bayesian Learning (SBL).
 
-\(Q_{smn}^{(c)}\) are called the wave coefficients and are the unknowns to be estimated. \(\eta\) is the specific admittance and defined as \(\sqrt{\epsilon/\mu}\). \(c = 1\) and \(c = 2\) indicate standing waves, while \(c = 3\) represents an outward travelling wave, and \(c = 4\) an inward travelling wave. Since we regard only antennas in transmission mode in the abscence of refelction, only \(c=4\) will be regarded. \(s = 1\) denotes the m-function while \(s = 2\) gives the n-function. The spherical vector wave functions \(\mathbf{F}_{smn}^{(c)}(r,\theta,\phi)\) are defined as:
+\(\eta\) is the specific admittance and defined as \(\sqrt{\epsilon/\mu}\). \(s = 1\) denotes the m-function while \(s = 2\) gives the n-function. The spherical vector wave functions \(\mathbf{F}_{smn}^{(c)}(r,\theta,\phi)\) are defined as:
 \begin{equation}
     \begin{split}
         \mathbf{F}_{1mn}^{(c)}(r,\theta,\phi) = &\frac{1}{\sqrt{2 \pi}} \frac{1}{\sqrt{n(n+1)}} \left( -\frac{m}{|m|} \right)^m \\
@@ -536,26 +569,66 @@ The derivation of the normalized associated Legendre function can be expressed a
         &= -\sin\theta \sqrt{\frac{2n+1}{2} \frac{(n-m)!}{(n+m)!}} \frac{dP_n^{|m|}(\cos \theta)}{d\cos \theta}
     \end{split}
 \end{equation}
-The radial function \(z_n^{(c)}(kr)\) depend on the wave type \(c\) and are defined as:
+
+
+\section{Near-Field to Far-Field Transformation (NFFFT)}
+\subsection{NFFFT Using Spherical Wave Expansion}
+This section describes how the spherical wave expansion framework can be utilized to perform the NFFFT, particularly focusing on the transition from near-field measurements to far-field patterns using the asymptotic behavior of the spherical vector wave functions.
+
+The near-field $\mathbf{E}(r,\theta,\phi)$ of an antenna under test (AUT) is expressed as a linear combination of spherical vector wave functions $\mathbf{F}_{smn}^{(c)}(r,\theta,\phi)$, as shown in Equation (\ref{eq:hansenEfield})
+
+For antennas operating in transmission mode without reflections, only the outward traveling wave ($c=3$) is considered. Thus, the summation over $c$ reduces to $c=3$, simplifying the expression for the near-field:
+
 \begin{equation}
-    z_n^{(c)}(kr) = \begin{cases}
-        j_n(kr) & , c = 1 \\
-        n_n(kr) & , c = 2 \\
-        h_n^{(1)}(kr) = j_n(kr) + i n_n(kr) & , c = 3 \\
-        h_n^{(2)}(kr) = j_n(kr) - i n_n(kr) & , c = 4
-    \end{cases}
+    \mathbf{E}(r,\theta,\phi) = \frac{k}{\sqrt{\eta}} \sum_{s=1}^2 \sum_{n=1}^\infty \sum_{m=-n}^n Q_{smn}^{(3)} \mathbf{F}_{smn}^{(3)}(r,\theta,\phi).
 \end{equation}
 
-\subsection{Implementation}
+To compute the far-field pattern, we exploit the asymptotic behavior of the spherical vector wave functions as $kr \to \infty$. In the far-field region, the radial dependence of the spherical wave functions simplifies, allowing us to express the electric and magnetic fields in terms of angular variables only.
+
+From Hansen's work \cite{hansen1988spherical}, the far-field pattern functions $\mathbf{K}_{smn}(\theta,\phi)$ are defined as:
+
+\begin{equation}
+    \mathbf{K}_{smn}(\theta,\phi) = \lim_{kr \to \infty} \left[ \sqrt{4\pi} \frac{kr}{e^{ikr}} \mathbf{F}_{smn}^{(3)}(r,\theta,\phi) \right].
+\end{equation}
+
+These far-field pattern functions encapsulate the angular dependence of the radiated field and are used to reconstruct the far-field electric and magnetic fields. Specifically, the far-field electric field $\mathbf{E}(r,\theta,\phi)$ is given by:
+
+\begin{align}
+    \mathbf{E}(r,\theta,\phi) = \frac{k}{\sqrt{\eta}} \frac{1}{\sqrt{4\pi}} \frac{e^{ikr}}{kr} \sum_{smn} Q_{smn}^{(3)} \mathbf{K}_{smn}(\theta,\phi).
+\end{align}
+
+The far-field pattern functions $\mathbf{K}_{smn}(\theta,\phi)$ are explicitly defined in terms of the normalized associated Legendre functions $\bar{P}_n^{|m|}(\cos\theta)$ and their derivatives. For $s=1$ (corresponding to $\mathbf{m}$-vector functions) and $s=2$ (corresponding to $\mathbf{n}$-vector functions), the expressions are:
+
+\begin{align}
+    \mathbf{K}_{1mn}(\theta,\phi) &= \sqrt{\frac{2}{n(n+1)}} \left(-\frac{m}{|m|}\right)^m e^{im\phi} (-i)^{n+1} \\
+    &\quad \times \left\{ \frac{im \bar{P}_n^{|m|}(\cos\theta)}{\sin\theta} \boldsymbol{\hat{\theta}} - \frac{d\bar{P}_n^{|m|}(\cos\theta)}{d\theta} \boldsymbol{\hat{\phi}} \right\}, \\
+    \mathbf{K}_{2mn}(\theta,\phi) &= \sqrt{\frac{2}{n(n+1)}} \left(-\frac{m}{|m|}\right)^m e^{im\phi} (-i)^n \\
+    &\quad \times \left\{ \frac{d\bar{P}_n^{|m|}(\cos\theta)}{d\theta} \boldsymbol{\hat{\theta}} + \frac{im \bar{P}_n^{|m|}(\cos\theta)}{\sin\theta} \boldsymbol{\hat{\phi}} \right\}.
+\end{align}
+These functions describe the angular distribution of the radiated field in the far-field region.
+
+
+\subsection{NFFFT using SBL}
+In this section, we build upon the findings of \citet{Hofmann2019minimum}, who investigated the minimum number of measurement samples required for a sparse near-field to far-field transformation (NFFFT) under the assumption of sparsity in the spherical harmonics domain. Their work provides a theoretical and practical foundation for evaluating how compressed sensing (CS) techniques can be applied to reduce the number of spatial sampling points needed in antenna measurements, while still achieving a desired reconstruction accuracy.
+
+The framework used in their study relies on the spherical vector wave expansion of the radiated electromagnetic field, following the notation introduced by \citet{hansen1988spherical}. The electric field $\mathbf{E}(r,\theta,\phi)$ is expressed as a linear combination of spherical vector wave functions as shown in equation \ref{eq:expansion} where $Q_{smn}^{(c)}$ are the unknown complex wave coefficients corresponding to each mode $(s,n,m,c)$, and $\mathbf{F}_{smn}^{(c)}(r,\theta,\phi)$ are the spherical vector wave functions. This formulation closely aligns with the SBL framework described earlier, where:
+\begin{itemize}
+\item $\mathbf{E}(r,\theta,\phi)$ corresponds to the measurement vector $\mathbf{t}$,
+\item $\mathbf{F}_{smn}^{(c)}(r,\theta,\phi)$ form the columns of the dictionary matrix $\Phi$,
+\item $Q_{smn}^{(c)}$ represent the sparse weight vector $\mathbf{w}$ to be estimated.
+\end{itemize}
+We try to adopt this methodology in the current work and compare it to the results shown in the paper.
+
+%\subsubsection{Implementation}
 In the SBL framework, the spherical harmonics domain is embedded by representing the measured electromagnetic field as a linear combination of spherical vector wave functions, which serve as the basis functions. The measurement matrix $\Phi$ (or $F$ in the code) has dimensions $(N, D, 3)$, where $N$ is the number of spatial sampling points (each corresponding to a unique pair of angles $(\theta, \phi)$), $D$ is the total number of spherical harmonics modes (indexed by $(n, m, s)$), and the third dimension corresponds to the three Spherical field components (e.g., $E_r$, $E_\theta$, $E_\phi$). The measurement vector $\mathbf{t}$ is initially a matrix of shape $(N, 3)$, containing the three field components at each spatial point. To apply the SBL algorithm, which requires a standard linear model with scalar-valued entries, both $\Phi$ and $\mathbf{t}$ are reshaped: $\Phi$ is transformed to a matrix of shape $(3N, D)$ by stacking the field components for all points, and $\mathbf{t}$ is flattened to a vector of length $3N$. This allows the vector-valued measurement problem to be cast as a standard SBL problem, where the physical structure of the spherical harmonics expansion is preserved in the dictionary and the mapping between physical and matrix dimensions is explicit.
+In future considerations, particularly with respect to sparsity, it should be taken into account that a total of $3N$ measurements are available. An undersampling factor $\delta = N/D = 1/3$ implies that the effective measurement matrix has dimensions $(3N) \times D$, and if $D = 3N$, this would suggest that no undersampling in the conventional sense actually occurs. However, the physical implications of this interpretation still need to be investigated.
 
-\subsection{Antenna Simulation}
-
+\section{Performance Assessment on Simulation Data}
 \subsection{Antenna Simulation}
 
 To validate the SBL-based near-field reconstruction approach described above, a set of synthetic antenna measurements was generated using MATLAB's Antenna Toolbox. Initially, an attempt was made to simulate more complex antenna structures in CST Microwave Studio. However, due to limitations in the student version of CST, specifically the lack of support for exporting radiation patterns in spherical coordinates, this path was not viable for generating high-resolution spherical near-field data.
 
-An alternative approach was adopted by modeling simple canonical antennas—specifically, a half-wave dipole and a loop antenna—operating at 2.4 GHz using MATLAB’s built-in functions. These provide well-defined and analytically tractable radiation characteristics, making them ideal for testing and validating reconstruction algorithms. The simulated electric field patterns were exported in spherical coordinates $(r, \theta, \phi)$, with a resolution of $1^\circ$ in both the polar ($\theta$) and azimuthal ($\phi$) directions.
+An alternative approach was adopted by modeling simple canonical antennas—specifically, a half-wave dipole and a loop antenna—operating at 2.4 GHz using MATLAB’s built-in functions. The simulated electric field patterns were exported in spherical coordinates $(r, \theta, \phi)$, with a resolution of $1^\circ$ in both the polar ($\theta$) and azimuthal ($\phi$) directions.
 
 Two distinct radial distances were considered for the field evaluation:
 \begin{itemize}
@@ -578,11 +651,12 @@ The results can be seen in figure \ref{fig:dipole_rad}.
 
 Initial experiments focused on the expansion of the simulated far-field radiation patterns into spherical vector wave harmonics, followed by their reconstruction using the derived coefficients. The electric field data obtained from MATLAB Antenna Toolbox at a radial distance of $r = 5\lambda$ (representing the far-field region) was used for this purpose.
 
-The measurement matrix $\Phi$ (denoted as $F$ in implementation) was constructed based on the theoretical expressions of the spherical vector wave functions $\mathbf{F}_{smn}^{(c)}$, evaluated at the corresponding wavenumber $k$ and radius $r$. Subsequently, the wave coefficients $Q_{smn}^{(3)}$—corresponding to outward-propagating waves—were estimated using the Fast Marginal Likelihood Maximization algorithm.
+The measurement matrix $\Phi$ (denoted as $F$ in implementation) was constructed based on the theoretical expressions of the spherical vector wave functions $\mathbf{F}_{smn}^{(c)}$, evaluated at the corresponding wavenumber $k$ and radius $r$. Subsequently, the wave coefficients $Q_{smn}^{(3)}$—corresponding to outward-propagating waves—were estimated using the FML Maximization algorithm.
 
 To assess the accuracy of the expansion and reconstruction process, the original field $\mathbf{E}_{\text{org}}$ was reconstructed via $\mathbf{E}_{\text{rec}} = \Phi \mathbf{w}$, where $\mathbf{w}$ represents the estimated coefficient vector. The relative reconstruction error was quantified using the normalized mean squared error (MSE):
 \[
 \text{MSE}_{\text{rel}} = \frac{\|\mathbf{E}_{\text{rec}} - \mathbf{E}_{\text{org}}\|}{\|\mathbf{E}_{\text{org}}\|}.
+\label{eq:MSE}
 \]
 
 These experiments were conducted using $N_{\text{modes}} = 25$, resulting in a total of $D = 2N_{\text{modes}}^2 + 4N_{\text{modes}} = 1350$ basis functions. The spatial resolution of the input field was systematically reduced by downsampling the angular sampling grid $(\theta, \phi)$ with a factor $k$, leading to a varying number of measurement points $N$. The ratio $\delta = N/D$ was used as an independent variable to evaluate the reconstruction performance under different undersampling conditions.
@@ -597,24 +671,95 @@ Figure \ref{fig:mse_ff} shows the relative MSE as a function of $\delta$ for bot
 
 In contrast, the dipole antenna exhibits robust reconstruction performance even under substantial undersampling, indicating that its radiation pattern is well-represented within the sparse spherical harmonics domain. However, the consistently higher reconstruction error for the loop antenna underscores the strong dependence of SBL performance on the specific radiation characteristics and topology of the source.
 
-To further investigate the observed discrepancies and to validate the SBL results, a comparison was made between the coefficients obtained via the Fast Marginal Likelihood Algorithm and those computed through direct mode expansion using numerical integration, as theoretically described in Equation \ref{eq:expansion}. For the dipole antenna, there was a notable agreement between the dominant coefficients identified by both methods, as illustrated in Figure \ref{fig:dipole_weights}. This consistency supports the validity of the SBL-based estimation approach.
+It should once again be emphasized that, at this point, it would have been crucial to compare the results of the FML algorithm with those of the Spherical Wave harmonic expansion obtained via integration, as theoretically described in Equation \ref{eq:expansion}, used as a baseline, especially in relation to undersampling performance.
 
-However, for the loop antenna, shown in Figure \ref{fig:loop_weights}, no such correspondence was observed. These results suggest either a fundamental difference in the sparsity structure of the loop antenna’s field representation or unresolved inaccuracies in the implementation of the spherical wave basis functions. A fully validated wave mode expansion method would have been essential for clarifying these observations; unfortunately, such a method could not be reliably implemented due to the challenges previously described.
+To further investigate the observed discrepancies and to validate the SBL results, a comparison was made between the coefficients obtained via the FML algorithm and those computed through direct mode expansion using numerical integration. For the loop antenna, there was a notable agreement between the dominant coefficients identified by both methods, as illustrated in Figure \ref{fig:loop_weights}. This consistency supports the validity of the SBL-based estimation approach.
+
+However, for the dipole antenna, shown in Figure \ref{fig:dipole_weights}, no such correspondence was observed. These results suggest either a fundamental difference in the sparsity structure of the loop antenna’s field representation or unresolved inaccuracies in the implementation of the spherical wave basis functions. A fully validated wave mode expansion method would have been essential for clarifying these observations; unfortunately, such a method could not be reliably implemented due to the challenges previously described.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=1\linewidth]{Figures/dipole_ff_weights.png}
-    \caption{Comparison of wave coefficients for the dipole antenna: non-zero weights estimated by the Fast Marginal Likelihood Algorithm (left) versus significant coefficients obtained via direct integration (right).}
+    \caption{Comparison of wave coefficients for the dipole antenna: non-zero weights estimated by the FML algorithm (left) versus significant coefficients obtained via direct integration (right).}
     \label{fig:dipole_weights}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=1\linewidth]{Figures/loop_ff_weights.png}
-    \caption{Comparison of wave coefficients for the loop antenna: non-zero weights estimated by the Fast Marginal Likelihood Algorithm (left) versus significant coefficients obtained via direct integration (right).}
+    \caption{Comparison of wave coefficients for the loop antenna: non-zero weights estimated by the FML algorithm (left) versus significant coefficients obtained via direct integration (right).}
     \label{fig:loop_weights}
 \end{figure}
 
+
+\subsection{Near-Field to Far-Field Reconstruction Using Spherical Wave Expansion}
+
+Following the expansion and reconstruction of the far-field patterns, the next step involved applying the spherical wave expansion framework to perform a true near-field to far-field transformation (NFFFT). In this approach, the field coefficients were estimated from near-field data and subsequently used to reconstruct the far-field pattern at a larger radial distance.
+
+The electric field was sampled at a radial distance of $r = 0.5\lambda$, representing the near-field region of the antenna under test. Using the same theoretical formulation for the spherical vector wave functions $\mathbf{F}_{smn}^{(c)}$, the measurement matrix $\Phi$ was constructed at this near-field radius. The wave coefficients $Q_{smn}^{(3)}$—again corresponding to outward-propagating waves—were estimated using the FML Maximization algorithm.
+
+Once the coefficients were determined, they were used to compute the radiated field at $r = 5\lambda$, which lies well within the far-field region. This was done by evaluating the spherical vector wave functions $\mathbf{F}_{smn}^{(c)}$ at $r = 5\lambda$ and computing the reconstructed far-field as:
+\[
+\mathbf{E}_{\text{rec}}(5\lambda, \theta, \phi) = \frac{k}{\sqrt{\eta}} \sum_{s,n,m} Q_{smn}^{(3)} \mathbf{F}_{smn}^{(3)}(5\lambda, \theta, \phi).
+\]
+
+To evaluate the accuracy of this NFFFT process, the reconstructed field $\mathbf{E}_{\text{rec}}$ was compared with the directly simulated far-field $\mathbf{E}_{\text{org}}$ at $r = 5\lambda$. The relative error was again quantified using the normalized mean squared error (MSE) as described in equation \ref{eq:MSE}.
+
+Even when the undersampling ratio was set to $\delta = 1$—meaning that the number of measurements equaled the number of unknowns—the resulting MSE was extremely high for both the dipole and loop antennas. This indicates a significant discrepancy between the reconstructed and original fields, despite the system being theoretically solvable in such a case.
+
+Next, the consistency of the wave coefficients across field regions was assessed by comparing the weights obtained from near-field measurements with those derived from far-field simulations. As in the previous analysis, the focus was on evaluating whether the FML algorithm identify the same dominant spherical wave expansion coefficients, for both near- and far-field patterns. The comparison aimed to reveal not only qualitative similarities in the structure of the coefficient distributions but also potential discrepancies in magnitude and mode selection between the near-field and far-field reconstructions.
+
+In particular, for the loop antenna, it becomes evident that the SBL algorithm identifies the same dominant coefficients—those with the highest weights $Q_{smn}$—both in the near-field and far-field cases. This suggests a certain robustness in the method's ability to identify the most significant modes contributing to the radiated field. However, discrepancies arise in the magnitudes of these coefficients, and some less significant coefficients present in the near-field reconstruction are absent in the far-field case. This indicates that while the core radiation behavior is captured correctly, finer details may be lost or misrepresented when extrapolating from the near-field to the far-field using this approach.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Figures/dipole_nf_ff_weights.png}
+    \caption{Comparison of wave coefficients for the dipole antenna: non-zero weights estimated by the FML algorithm from the near-field versus significant coefficients obtained from the far-field.}
+    \label{fig:dipole_nfff_weights}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Figures/loop_nf_ff_weights.png}
+    \caption{Comparison of wave coefficients for the loop antenna: non-zero weights estimated by the FML algorithm from the near-field versus significant coefficients obtained from the far-field.}
+    \label{fig:loop_nfff_weights}
+\end{figure}
+
+This result highlights a critical challenge in applying the spherical wave expansion-based NFFFT: while the formalism is mathematically sound, its practical implementation must account for subtle numerical and physical effects that can severely impact reconstruction fidelity—even in seemingly well-conditioned scenarios. It has to be further assessed whether the differences in magnitude of the dominant coefficients between the near-field (NF) and far-field (FF) reconstructions obtained via the FML algorithm are the primary contributors to the high MSE observed. Additionally, it becomes evident once again that access to a reliable decomposition of spherical modes—serving as ground truth—would be an essential tool to pinpoint the exact limitations of the SBL method.
+
+
+\section{Conclusion}
+
+This project undertook a systematic investigation into compressive sensing methodologies, with a particular focus on their application to near-field to far-field transformations in antenna pattern extrapolation. Through this work, several key achievements were realized, alongside important challenges that highlight opportunities for further refinement.
+
+\subsection{Sparse Learning Algorithms}
+
+The initial phase of the project was dedicated to studying sparse learning algorithms—a field entirely new to me at the outset. This exploratory period, although time-intensive, was instrumental in building a solid conceptual foundation. The hands-on implementation of the Expectation-Maximization (EM) and Covariance-Free Expectation-Maximization (CoFEM) algorithms served as a valuable learning exercise, offering insight into the core principles of sparse signal recovery. Although these early implementations faced limitations when handling complex-valued data, they laid the groundwork for subsequent developments.
+
+The transition to Sparse Bayesian Learning (SBL), particularly with the inclusion of Stein’s Unbiased Risk Estimate (SURE) as formulated by \citet{slockSURE} and \citet{tipp2003fastsb}, posed significant theoretical challenges. However, through persistent study, a robust and functional implementation was successfully developed. The algorithm performed reliably across multiple test cases, showing no signs of instability or unexpected behavior—suggesting a correct and effective implementation. This part of the project thus represents a meaningful technical achievement. Nevertheless, certain theoretical aspects—such as the detailed derivation of SURE and its alignment with Tipping’s formulation, as well as the adaptation of EM/CoFEM for complex matrices—remain areas where deeper theoretical understanding would be beneficial.
+
+\subsection{Radiation Pattern, Electrodynamics, and Physics}
+
+The exploration of electrodynamics and radiation patterns, including spherical vector wave harmonics and near-field to far-field transformation techniques, began with a relatively brief literature review. In hindsight, this approach left some foundational concepts underdeveloped, which later hindered progress in implementing key components such as wave expansion via integration. As a result, the overall framework and objectives of the physical modeling portion lacked clarity at critical junctures.
+
+Relying primarily on relative Mean Squared Error (MSE) between field measurements as a performance metric, while practical, may not reflect the most physically meaningful aspects of reconstruction accuracy in real-world scenarios. Alternative metrics such as directivity could offer a more physically meaningful assessment of far-field fidelity. Additionally, questions remain regarding the suitability of the chosen radial distances—$0.5\lambda$ for near-field and $5\lambda$ for far-field—and whether these accurately represent the respective regions, especially considering the delineation of reactive and radiative zones.
+
+The use of MATLAB for simulations, while technically viable, introduced inefficiencies due to my limited familiarity with the environment of the antenna toolbox. Future efforts would benefit from transitioning to a more specialized and familiar simulation platform, such as CST Microwave Studio, which could provide more accurate and representative field data.
+
+However, despite these challenges, the theoretical foundation suggests that successful near-field to far-field transformation using sparse measurements is indeed feasible with the right modeling and algorithmic choices. Recent work by \citet{Hofmann2019minimum} demonstrates that minimum-energy extrapolation methods can yield highly accurate far-field reconstructions from limited near-field data. With further theoretical development and a deeper understanding of the underlying physics, similar results may be achievable using compressive sensing and sparse learning techniques. That said, realizing this potential will require substantial additional investigation into both the numerical implementation and the physical assumptions involved.
+\subsection{Code}
+
+While coding was not the central focus of the project, it played an essential role in enabling experimentation and analysis. A variety of functions were developed, including the core SBL algorithms and tools for evaluating radiation patterns. Significant effort was invested in ensuring the codebase was clean, reusable, and efficient—goals that were largely met, particularly in modules designed for comparative analysis of radiation patterns.
+
+That said, there are areas where the code can be improved. Some sections remain overly complex and would benefit from refactoring. The overall structure could be streamlined for greater clarity, and additional comments should be added to improve readability and maintainability. Furthermore, inconsistencies in function interfaces and argument usage could be addressed to enhance code coherence. Despite these considerations, the developed software forms a strong and extensible foundation for future research in this area.
+
+\subsection{Use of Large Language Models (LLMs)} 
+
+Large Language Models (LLMs) were used throughout the project as tools to assist with code development and writing. They helped with debugging, generating code comments, improving readability, and automating plotting scripts, which enhanced coding efficiency. 
+
+In the final stages of report preparation, LLMs were also used to rephrase and polish the text for clarity, conciseness, and grammatical accuracy. 
+
+All core work—including conceptualization, implementation, and analysis—was done by the author. LLMs were used only to support documentation and formatting tasks.
 
 \bibliography{Compressive_Sensing_Report}
 

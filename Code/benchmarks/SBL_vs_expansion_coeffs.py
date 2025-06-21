@@ -21,7 +21,7 @@ Efield_vec = transform_nearfield_to_vector(Efield)
 
 ab_coeffs_exp = F_expansion(Efield, N_modes, k, R, NF=True)
 abF,nms_idx,thetaphi_idx = F_matrix_alt(Efield.theta, Efield.phi, R=R, N_modes=N_modes, k=k)
-sbl_vec_F = SBL_Fast_Vector(Efield_vec, abF, max_iter=100, threshold=1e-8)
+sbl_vec_F = SBL_Fast_Vector(Efield_vec, abF, max_iter=1000, threshold=1e-8)
 w_est_F, basis = sbl_vec_F.fit()
 weights_sbl = np.concatenate([nms_idx, w_est_F.reshape(-1,1)], axis=1)
 weights_exp = np.concatenate([nms_idx, ab_coeffs_exp.reshape(-1,1)], axis=1)
